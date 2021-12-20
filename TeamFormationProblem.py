@@ -1,12 +1,11 @@
-## Implementation Framework for Team Formation problem
+## Implementation of Framework for Team Formation problem
 ## Balancing Task Coverage vs. Maximum Expert Load
 ## Karan Vombatkere, Dec 2021
 
-import numpy as np
-import pandas as pd
-import time
 
-#Set logging level
+#Import and logging config
+import numpy as np
+import time
 import logging
 logging.basicConfig(format='%(asctime)s |%(levelname)s: %(message)s', level=logging.INFO)
 
