@@ -179,8 +179,8 @@ class TeamFormationProblem:
                 #Get experts currently assigned to T_j
                 T_j_assigned_experts_indices = self.getExpertsAssignedToTask(taskAssignment, j)
 
-                #Check if this expert is already assigned to T_j
-                if i not in T_j_assigned_experts_indices:
+                #Check if this expert is not yet assigned to T_j
+                if taskAssignment[i,j] == 0:
                     #Compute union of skills of all experts assigned to T_j
                     expert_skills = self.getExpertSkillSet(T_j_assigned_experts_indices)
                     
