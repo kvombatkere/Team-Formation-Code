@@ -158,13 +158,16 @@ class TeamFormationProblem:
 
 
 
-    def getBestExpertTaskEdge(self, taskAssignment, experts_array_indices, current_coverage_list):
+    def getBestExpertTaskEdge(self, taskAssignment, experts_copies, current_coverage_list, 
+                                    current_expert_task_list, current_expert_union_skills):
         '''
         Greedily compute the best expert-task edge (assigment) that maximizes coverage in that iteration
         ARGS:
             taskAssignment : current task assigment
-            experts_array_indices  : current list of available experts, as index values
+            experts_copies  : current list of number of copies available of experts
             current_coverage_list    : current total task coverage of each task
+            current_expert_task_list    : list of current expert assignments for each task
+            current_expert_union_skills  : list of union of expert skills as per the current task assignment
         RETURN:
             max_edge_coverage  : maximum value of change in task coverage by adding edge (i,j)
             bestExpertTaskEdge  : indices of expert and task as a tuple (i,j)
@@ -172,17 +175,20 @@ class TeamFormationProblem:
         bestExpertTaskEdge = None
         max_edge_coverage = 0
         
-        for i in experts_array_indices:
-            E_i = self.experts[i]
+        for i, E_i in enumerate(self.experts):
             for j, T_j in enumerate(self.tasks):
 
                 #Get experts currently assigned to T_j
-                T_j_assigned_experts_indices = self.getExpertsAssignedToTask(taskAssignment, j)
+                #T_j_assigned_experts_indices = self.getExpertsAssignedToTask(taskAssignment, j)
+                T_j_assigned_experts_indices = current_expert_task_list[j]
 
-                #Check if this expert is not yet assigned to T_j
-                if taskAssignment[i,j] == 0:
+                #Check if this expert is not yet assigned to T_j (A[i,j] = 0) AND copies are left
+                if (taskAssignment[i,j] == 0) and (experts_copies[i] != 0):
                     #Compute union of skills of all experts assigned to T_j
-                    expert_skills = self.getExpertSkillSet(T_j_assigned_experts_indices)
+                    #expert_skills = self.getExpertSkillSet(T_j_assigned_experts_indices)
+
+                    #Retrieve union of skills of all experts assigned to T_j
+                    expert_skills = current_expert_union_skills[j]
                     
                     expert_skills = expert_skills.union(set(E_i))       #Add expert E_i
                     task_skills = set(T_j)      #Get task skills as a set
@@ -218,11 +224,11 @@ class TeamFormationProblem:
 
 
 
-    def greedyTaskAssignment(self, experts_arr_indices):
+    def greedyTaskAssignment(self, expert_copies_list):
         '''
         Greedily compute a Task Assignment given a set of tasks and experts
         ARGS:
-            experts_arr_indices  : list of available experts, as index values
+            expert_copies_list  : list of number of copies of each expert
         RETURN:
             taskAssignment  : greedy task assigment
         '''
@@ -233,26 +239,34 @@ class TeamFormationProblem:
 
         #Initialize current coverage list
         currentCoverageList = self.computeTotalTaskCoverage(taskAssignment_i)
+
+        #Initialize expert-task list as an empty list of lists
+        currentExpertTaskList = [[] for i in range(self.m)]
+
+        #Initialize expert union skills list as an empty list of sets
+        currentExpertUnionSkills = [set() for j in range(self.m)]
         
         #Get next best assignment and coverage value
-        deltaCoverage, best_ExpertTaskEdge = self.getBestExpertTaskEdge(taskAssignment_i, experts_arr_indices, currentCoverageList)
+        deltaCoverage, best_ExpertTaskEdge = self.getBestExpertTaskEdge(taskAssignment_i, expert_copies_list, currentCoverageList, 
+                                                                                currentExpertTaskList, currentExpertUnionSkills)
 
-        #Assign edges until there is no more coverage possible or no experts left
-        while (deltaCoverage != 0) and (experts_arr_indices):
+        #Assign edges until there is no more coverage possible or no expert copies left
+        while (deltaCoverage != 0) and (sum(expert_copies_list) != 0):
 
             #Add edge to assignment
             taskAssignment_i[best_ExpertTaskEdge[0], best_ExpertTaskEdge[1]] = 1
             #self.displayTaskAssignment(taskAssignment_i)
 
-            #Remove expert from experts_arr_indices
-            experts_arr_indices.remove(best_ExpertTaskEdge[0])
+            #Decrement expert copy
+            expert_copies_list[best_ExpertTaskEdge[0]] -= 1
             
             #Calculate current coverage list
             currentCoverageList = self.computeTotalTaskCoverage(taskAssignment_i)
             logging.debug("Current Coverage List = {}".format(currentCoverageList))
 
             #Get next best assignment and coverage value
-            deltaCoverage, best_ExpertTaskEdge = self.getBestExpertTaskEdge(taskAssignment_i, experts_arr_indices, currentCoverageList)
+            deltaCoverage, best_ExpertTaskEdge = self.getBestExpertTaskEdge(taskAssignment_i, expert_copies_list, currentCoverageList, 
+                                                                                currentExpertTaskList, currentExpertUnionSkills)
             logging.debug("deltaCoverage={:.1f}, best_ExpertTaskEdge={}".format(deltaCoverage, best_ExpertTaskEdge))
         
 
@@ -277,12 +291,12 @@ class TeamFormationProblem:
             logging.info('--------------------------------------------------------------------------------------------------')
             logging.info("Computing Greedy Task Assignment for threshold max load, T_i={}".format(T_i))
 
-            #Create T_i copies of each expert, using index values
-            experts_index_list_T_i = [indx for indx in range(self.n)]*T_i
-            logging.info("Expert Index List: {}".format(experts_index_list_T_i))
+            #Create T_i copies of each expert, using a single list to keep track of copies
+            experts_copy_list_T_i = [T_i for i in range(self.n)]
+            logging.info("Expert Copy List: {}".format(experts_copy_list_T_i))
 
             #Greedily assign experts to tasks using this expert list
-            taskAssignment_T_i = self.greedyTaskAssignment(experts_index_list_T_i)       
+            taskAssignment_T_i = self.greedyTaskAssignment(experts_copy_list_T_i)       
             logging.info("Greedy Task Assignment = \n{}".format(taskAssignment_T_i))
 
             #Compute Objective: Coverage - T_i
