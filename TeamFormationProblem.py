@@ -5,9 +5,11 @@
 
 #Import and logging config
 import numpy as np
+from heapq import heappop, heappush, heapify
 import time
 import logging
 logging.basicConfig(format='%(asctime)s |%(levelname)s: %(message)s', level=logging.INFO)
+
 
 
 class TeamFormationProblem:
@@ -63,7 +65,22 @@ class TeamFormationProblem:
                 assigned_experts_indices.append(expert_index)
 
         return assigned_experts_indices
+
+
     
+    def displayTaskAssignment(self, taskAssignment):
+        '''
+        Given a taskAssignment, print the assignment out for each expert
+        ARGS:
+            taskAssignment  : current task assigment
+        '''
+        for j in range(self.m):
+            #Get experts assigned to T_j
+            T_j_assigned_experts_indices = self.getExpertsAssignedToTask(taskAssignment, j)
+            
+            print("Experts Assigned to Task {}: {}".format(j, T_j_assigned_experts_indices))
+
+
 
     def updateCurrentCoverageList(self, bestExpertTaskEdge, delta_coverage):
         '''
@@ -85,6 +102,7 @@ class TeamFormationProblem:
         '''
         self.currentExpertUnionSkills[bestExpertTaskEdge['task_index']].union(self.experts[bestExpertTaskEdge['expert_index']])
         return
+
 
 
     def getBestExpertTaskEdge(self, taskAssignment, experts_copies):
@@ -130,21 +148,6 @@ class TeamFormationProblem:
 
 
 
-    def displayTaskAssignment(self, taskAssignment):
-        '''
-        Given a taskAssignment, print the assignment out for each expert
-        ARGS:
-            taskAssignment  : current task assigment
-        '''
-        for j in range(self.m):
-            #Get experts assigned to T_j
-            T_j_assigned_experts_indices = self.getExpertsAssignedToTask(taskAssignment, j)
-            
-            print("Experts Assigned to Task {}: {}".format(j, T_j_assigned_experts_indices))
-
-
-
-
     def greedyTaskAssignment(self, expert_copies_list):
         '''
         Greedily compute a Task Assignment given a set of tasks and experts
@@ -164,7 +167,7 @@ class TeamFormationProblem:
         #Initialize expert union skills list as an empty list of sets
         self.currentExpertUnionSkills = [set() for j in range(self.m)]
         
-        #Get next best assignment and coverage value
+        #Get first best expert-task assignment and delta coverage value
         deltaCoverage, best_ExpertTaskEdge = self.getBestExpertTaskEdge(taskAssignment_i, expert_copies_list)
 
         #Assign edges until there is no more coverage possible or no expert copies left
@@ -172,16 +175,11 @@ class TeamFormationProblem:
 
             #Add edge to assignment
             taskAssignment_i[best_ExpertTaskEdge['expert_index'], best_ExpertTaskEdge['task_index']] = 1
-            #self.displayTaskAssignment(taskAssignment_i)
 
             ##Perform updates 
-            #Decrement expert copy
+            #Decrement expert copy, Update current coverage list and expert union skills list
             expert_copies_list[best_ExpertTaskEdge['expert_index']] -= 1
-            
-            #Update current coverage list
             self.updateCurrentCoverageList(best_ExpertTaskEdge, deltaCoverage)
-
-            #Update expert union skills list
             self.updateExpertUnionSkillsList(best_ExpertTaskEdge)
 
             logging.debug("Current Coverage List = {}".format(self.currentCoverageList))
@@ -197,6 +195,95 @@ class TeamFormationProblem:
 
         return taskAssignment_i
 
+
+
+    def initializeMaxHeap(self):
+        '''
+        Initialize the max heap for the lazy greedy evaluation, by evaluating coverage of all expert-task edges
+        '''
+        self.maxHeap = []
+        heapify(self.maxHeap)
+
+        for i, E_i in enumerate(self.experts):
+            for j, T_j in enumerate(self.tasks):
+                expert_skills = set(E_i)    #Get expert E_i skills as set
+                task_skills = set(T_j)    #Get task T_j skills as set
+                
+                #Compute initial coverage of E_i-T_J edge
+                edge_coverage = len(expert_skills.intersection(task_skills))/len(task_skills)
+                heapItem = (edge_coverage*-1, i, j)
+
+                heappush(self.maxHeap, heapItem)
+
+        return
+
+
+    def getLazyExpertTaskEdge(self, taskAssignment, experts_copies):
+        '''
+        Lazy greedy compute the best expert-task edge (assigment) that maximizes coverage in that iteration
+        ARGS:
+            taskAssignment : current task assigment
+            experts_copies  : current list of number of copies available of experts
+        
+        RETURN:
+            max_edge_coverage  : maximum value of change in task coverage by adding edge (i,j)
+            bestExpertTaskEdge  : indices of expert and task as a tuple (i,j)
+        '''
+        #Use max heap to get the best edge
+        candidate_edge = heappop(self.maxHeap)
+
+
+
+
+    def lazyGreedyTaskAssignment(self, expert_copies_list):
+        '''
+        Lazy Greedy compute best expert-task edge (assigment) that maximizes coverage in that iteration
+        Use a max heap/priority queue to order edges
+        ARGS:
+            experts_copies  : current list of number of copies available of experts
+        
+        RETURN:
+            taskAssignment  : greedy task assigment, with lazy evaluation
+        '''
+        startTime = time.perf_counter()
+        #First initialize maxheap to store edge coverages in self.maxHeap
+        self.initializeMaxHeap()
+
+        #Create empty task assigment matrix
+        taskAssignment_i = np.zeros((self.n, self.m), dtype=np.int8)
+
+        #Initialize current coverage list and expert union skills list as an empty list of sets
+        self.currentCoverageList = [0 for i in range(self.m)]
+        self.currentExpertUnionSkills = [set() for j in range(self.m)]
+        
+        #Get first best expert-task assignment and delta coverage value
+        first_edge = heappop(self.maxHeap)
+
+        deltaCoverage=first_edge[0]
+        best_ExpertTaskEdge = {'expert_index': first_edge[1], 'task_index': first_edge[2]}
+
+        #Assign edges until there is no more coverage possible or no expert copies left
+        while (deltaCoverage != 0) and (sum(expert_copies_list) != 0):
+            #Add edge to assignment
+            taskAssignment_i[best_ExpertTaskEdge['expert_index'], best_ExpertTaskEdge['task_index']] = 1
+
+            ##Perform updates 
+            #Decrement expert copy, Update current coverage list and expert union skills list
+            expert_copies_list[best_ExpertTaskEdge['expert_index']] -= 1
+            self.updateCurrentCoverageList(best_ExpertTaskEdge, deltaCoverage)
+            self.updateExpertUnionSkillsList(best_ExpertTaskEdge)
+            logging.debug("Current Coverage List = {}".format(self.currentCoverageList))
+
+            #Get next best assignment and coverage value
+            deltaCoverage, best_ExpertTaskEdge = self.getLazyExpertTaskEdge(taskAssignment_i, expert_copies_list)
+            logging.debug("deltaCoverage={:.1f}, best_ExpertTaskEdge={}".format(deltaCoverage, best_ExpertTaskEdge))
+        
+
+        runTime = time.perf_counter() - startTime
+        logging.debug("Greedy Task Assignment computation time = {:.1f} seconds".format(runTime))
+
+        return taskAssignment_i
+        
 
 
     def computeTaskAssigment(self):
