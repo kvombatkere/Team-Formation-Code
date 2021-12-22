@@ -156,51 +156,62 @@ class TeamFormationProblem:
         else:
             return total_task_coverage_value
 
+    
+    def updateCurrentCoverageList(self, bestExpertTaskEdge, delta_coverage):
+        '''
+        Given a bestExpertTaskEdge, update the current coverage list
+        ARGS:
+            bestExpertTaskEdge  : best expert task edge
+            delta_coverage  : increase in coverage
+        '''
+        self.currentCoverageList[bestExpertTaskEdge['expert_index']] += delta_coverage
+        return
+
+    
+    def updateExpertUnionSkillsList(self, bestExpertTaskEdge):
+        '''
+        Given a bestExpertTaskEdge, update the expert union skills list
+        ARGS:
+            bestExpertTaskEdge  : best expert task edge
+        '''
+        self.currentExpertUnionSkills[bestExpertTaskEdge['task_index']].union(self.experts[bestExpertTaskEdge['expert_index']])
+        return
 
 
-    def getBestExpertTaskEdge(self, taskAssignment, experts_copies, current_coverage_list, 
-                                    current_expert_task_list, current_expert_union_skills):
+    def getBestExpertTaskEdge(self, taskAssignment, experts_copies):
         '''
         Greedily compute the best expert-task edge (assigment) that maximizes coverage in that iteration
         ARGS:
             taskAssignment : current task assigment
             experts_copies  : current list of number of copies available of experts
-            current_coverage_list    : current total task coverage of each task
-            current_expert_task_list    : list of current expert assignments for each task
-            current_expert_union_skills  : list of union of expert skills as per the current task assignment
+        
         RETURN:
             max_edge_coverage  : maximum value of change in task coverage by adding edge (i,j)
             bestExpertTaskEdge  : indices of expert and task as a tuple (i,j)
         '''
-        bestExpertTaskEdge = None
+        bestExpertTaskEdge = {'expert_index':None, 'task_index':None}
         max_edge_coverage = 0
         
         for i, E_i in enumerate(self.experts):
             for j, T_j in enumerate(self.tasks):
 
-                #Get experts currently assigned to T_j
-                #T_j_assigned_experts_indices = self.getExpertsAssignedToTask(taskAssignment, j)
-                T_j_assigned_experts_indices = current_expert_task_list[j]
-
                 #Check if this expert is not yet assigned to T_j (A[i,j] = 0) AND copies are left
                 if (taskAssignment[i,j] == 0) and (experts_copies[i] != 0):
-                    #Compute union of skills of all experts assigned to T_j
-                    #expert_skills = self.getExpertSkillSet(T_j_assigned_experts_indices)
-
                     #Retrieve union of skills of all experts assigned to T_j
-                    expert_skills = current_expert_union_skills[j]
+                    expert_skills = self.currentExpertUnionSkills[j]
                     
                     expert_skills = expert_skills.union(set(E_i))       #Add expert E_i
-                    task_skills = set(T_j)      #Get task skills as a set
+                    task_skills = set(T_j)    #Get task skills as a set
                     
                     #Compute task coverage with expert added
                     T_j_coverage = len(expert_skills.intersection(task_skills))/len(task_skills)
-                    delta_coverage = T_j_coverage - current_coverage_list[j]
+                    delta_coverage = T_j_coverage - self.currentCoverageList[j]
                     logging.debug("deltaCoverage={:.1f}, T_j_coverage={}".format(delta_coverage, T_j_coverage))
 
                     if delta_coverage > max_edge_coverage:
                         max_edge_coverage = delta_coverage
-                        bestExpertTaskEdge = (i,j)
+                        bestExpertTaskEdge['expert_index'] = i
+                        bestExpertTaskEdge['task_index'] = j
                         
                         #Return immediately if all skills in a task are covered
                         if max_edge_coverage == 1:
@@ -238,37 +249,45 @@ class TeamFormationProblem:
         taskAssignment_i = np.zeros((self.n, self.m), dtype=np.int8)
 
         #Initialize current coverage list
-        currentCoverageList = self.computeTotalTaskCoverage(taskAssignment_i)
+        self.currentCoverageList = [0 for i in range(self.m)]
 
         #Initialize expert-task list as an empty list of lists
-        currentExpertTaskList = [[] for i in range(self.m)]
+        self.currentExpertTaskList = [[] for i in range(self.m)]
 
         #Initialize expert union skills list as an empty list of sets
-        currentExpertUnionSkills = [set() for j in range(self.m)]
+        self.currentExpertUnionSkills = [set() for j in range(self.m)]
         
         #Get next best assignment and coverage value
-        deltaCoverage, best_ExpertTaskEdge = self.getBestExpertTaskEdge(taskAssignment_i, expert_copies_list, currentCoverageList, 
-                                                                                currentExpertTaskList, currentExpertUnionSkills)
+        deltaCoverage, best_ExpertTaskEdge = self.getBestExpertTaskEdge(taskAssignment_i, expert_copies_list)
 
         #Assign edges until there is no more coverage possible or no expert copies left
         while (deltaCoverage != 0) and (sum(expert_copies_list) != 0):
 
             #Add edge to assignment
-            taskAssignment_i[best_ExpertTaskEdge[0], best_ExpertTaskEdge[1]] = 1
+            taskAssignment_i[best_ExpertTaskEdge['expert_index'], best_ExpertTaskEdge['task_index']] = 1
             #self.displayTaskAssignment(taskAssignment_i)
+
+            ##Perform updates 
 
             #Decrement expert copy
             expert_copies_list[best_ExpertTaskEdge[0]] -= 1
             
-            #Calculate current coverage list
-            currentCoverageList = self.computeTotalTaskCoverage(taskAssignment_i)
-            logging.debug("Current Coverage List = {}".format(currentCoverageList))
+            #Update current coverage list
+            self.updateCurrentCoverageList(best_ExpertTaskEdge, deltaCoverage)
+
+            #Update expert union skills list
+            self.updateExpertUnionSkillsList(best_ExpertTaskEdge)
+
+            logging.debug("Current Coverage List = {}".format(self.currentCoverageList))
 
             #Get next best assignment and coverage value
-            deltaCoverage, best_ExpertTaskEdge = self.getBestExpertTaskEdge(taskAssignment_i, expert_copies_list, currentCoverageList, 
-                                                                                currentExpertTaskList, currentExpertUnionSkills)
+            deltaCoverage, best_ExpertTaskEdge = self.getBestExpertTaskEdge(taskAssignment_i, expert_copies_list)
+
             logging.debug("deltaCoverage={:.1f}, best_ExpertTaskEdge={}".format(deltaCoverage, best_ExpertTaskEdge))
         
+        
+        #Update current coverage list
+        self.updateCurrentCoverageList(best_ExpertTaskEdge, deltaCoverage)
 
         runTime = time.perf_counter() - startTime
         logging.debug("Greedy Task Assignment computation time = {:.1f} seconds".format(runTime))
@@ -300,7 +319,7 @@ class TeamFormationProblem:
             logging.info("Greedy Task Assignment = \n{}".format(taskAssignment_T_i))
 
             #Compute Objective: Coverage - T_i
-            F_i = self.computeTotalTaskCoverage(taskAssignment_T_i, list_flag=False) - T_i
+            F_i = sum(self.currentCoverageList) - T_i
             logging.info("F_i = {:.3f}".format(F_i))
 
             if F_i > F_max:
