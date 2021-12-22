@@ -2,14 +2,12 @@
 ## Balancing Task Coverage vs. Maximum Expert Load
 ## Karan Vombatkere, Dec 2021
 
-
 #Import and logging config
 import numpy as np
 from heapq import heappop, heappush, heapify
 import time
 import logging
 logging.basicConfig(format='%(asctime)s |%(levelname)s: %(message)s', level=logging.INFO)
-
 
 
 class TeamFormationProblem:
@@ -25,6 +23,7 @@ class TeamFormationProblem:
     self.taskAssignment  : Created (n x m) matrix to store task assignment
                             n rows represent the n experts, m columns are for m tasks
     '''
+
 
     def __init__(self, m_tasks, n_experts, max_workload_threshold=3):
         '''
@@ -84,7 +83,8 @@ class TeamFormationProblem:
 
     def updateCurrentCoverageList(self, bestExpertTaskEdge, delta_coverage):
         '''
-        Given a bestExpertTaskEdge, update the current coverage list
+        Given a bestExpertTaskEdge and delta_coverage, update the current coverage list
+        Updates self.currentCoverageList
         ARGS:
             bestExpertTaskEdge  : best expert task edge
             delta_coverage  : increase in coverage
@@ -97,6 +97,7 @@ class TeamFormationProblem:
     def updateExpertUnionSkillsList(self, bestExpertTaskEdge):
         '''
         Given a bestExpertTaskEdge, update the expert union skills list
+        Updates self.currentExpertUnionSkills
         ARGS:
             bestExpertTaskEdge  : best expert task edge
         '''
@@ -114,7 +115,7 @@ class TeamFormationProblem:
         
         RETURN:
             max_edge_coverage  : maximum value of change in task coverage by adding edge (i,j)
-            bestExpertTaskEdge  : indices of expert and task as a tuple (i,j)
+            bestExpertTaskEdge  : indices of expert and task as a dictionary
         '''
         bestExpertTaskEdge = {'expert_index':None, 'task_index':None}
         max_edge_coverage = 0
@@ -151,8 +152,9 @@ class TeamFormationProblem:
         Greedily compute a Task Assignment given a set of tasks and experts
         ARGS:
             expert_copies_list  : list of number of copies of each expert
+        
         RETURN:
-            taskAssignment  : greedy task assigment
+            taskAssignment  : greedy task assigment, an n x m matrix
         '''
         startTime = time.perf_counter()
 
@@ -197,6 +199,7 @@ class TeamFormationProblem:
     def initializeMaxHeap(self):
         '''
         Initialize the max heap for the lazy greedy evaluation, by evaluating coverage of all expert-task edges
+        Creates and updates self.maxHeap
         '''
         self.maxHeap = []
         heapify(self.maxHeap)
@@ -218,19 +221,19 @@ class TeamFormationProblem:
 
     def getLazyExpertTaskEdge(self, taskAssignment, experts_copies):
         '''
-        Lazy greedy compute the best expert-task edge (assigment) that maximizes coverage in that iteration
+        Lazy greedy compute the best expert-task edge (assigment) using self.maxHeap
         ARGS:
             taskAssignment : current task assigment
             experts_copies  : current list of number of copies available of experts
         
         RETURN:
             max_edge_coverage  : maximum value of change in task coverage by adding edge (i,j)
-            bestExpertTaskEdge  : indices of expert and task as a tuple (i,j)
+            bestExpertTaskEdge  : indices of expert and task as a dictionary
         '''
         bestExpertTaskEdge = {'expert_index':None, 'task_index':None}
         delta_best = 0
 
-        while len(self.maxHeap)>1:
+        while len(self.maxHeap) > 1:
             #Pop best edge from maxHeap
             best_edge = heappop(self.maxHeap)
             second_edge = self.maxHeap[0] #Check item now on top
@@ -279,10 +282,9 @@ class TeamFormationProblem:
 
     def lazyGreedyTaskAssignment(self, expert_copies_list):
         '''
-        Lazy Greedy compute best expert-task edge (assigment) that maximizes coverage in that iteration
-        Use a max heap/priority queue to order edges
+        Lazy Greedy compute task assignment. Uses similar framework as greedyTaskAssignment() but with self.maxHeap to order edges
         ARGS:
-            experts_copies  : current list of number of copies available of experts
+            expert_copies_list : list of number of copies available of experts
         
         RETURN:
             taskAssignment  : greedy task assigment, with lazy evaluation
@@ -333,7 +335,6 @@ class TeamFormationProblem:
         Compute a Task Assignment, of experts to tasks.
         Use m thresholds for the maximum load, and call a greedy method for each threshold
         Store this task assignment in self.taskAssignment
-        
         ARGS:
             lazy_eval  : Lazy Greedy evaluation, set True as default
         '''
@@ -375,6 +376,7 @@ class TeamFormationProblem:
         logging.info("\nTotal Computation time = {:.3f} seconds".format(runTime))
 
         return None
+
 
 
     def compareTest_Lazy_Regular_Assignments(self):
