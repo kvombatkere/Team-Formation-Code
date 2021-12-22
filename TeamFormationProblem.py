@@ -124,10 +124,8 @@ class TeamFormationProblem:
 
                 #Check if this expert is not yet assigned to T_j (A[i,j] = 0) AND copies are left
                 if (taskAssignment[i,j] == 0) and (experts_copies[i] != 0):
-                    #Retrieve union of skills of all experts assigned to T_j
-                    expert_skills = self.currentExpertUnionSkills[j]
-                    
-                    expert_skills = expert_skills.union(set(E_i))       #Add expert E_i
+                    #Retrieve union of skills of all experts assigned to T_j and add expert E_i
+                    expert_skills = self.currentExpertUnionSkills[j].union(set(E_i))
                     task_skills = set(T_j)    #Get task skills as a set
                     
                     #Compute task coverage with expert added
@@ -218,6 +216,7 @@ class TeamFormationProblem:
         return
 
 
+
     def getLazyExpertTaskEdge(self, taskAssignment, experts_copies):
         '''
         Lazy greedy compute the best expert-task edge (assigment) that maximizes coverage in that iteration
@@ -229,9 +228,43 @@ class TeamFormationProblem:
             max_edge_coverage  : maximum value of change in task coverage by adding edge (i,j)
             bestExpertTaskEdge  : indices of expert and task as a tuple (i,j)
         '''
-        #Use max heap to get the best edge
-        candidate_edge = heappop(self.maxHeap)
+        bestExpertTaskEdge = {'expert_index':None, 'task_index':None}
+        delta_best = 0
 
+        while self.maxHeap:
+            #Pop best edge from maxHeap
+            best_edge = heappop(self.maxHeap)
+            second_edge = self.maxHeap[0] #Check item now on top
+            delta_second = second_edge[0]
+
+            #Compute coverage of top edge - Retrieve expert and task indices of top edge
+            best_expert_i, best_task_j  = best_edge[1], best_edge[2]
+
+            #Check if this expert is not yet assigned to T_j (A[i,j] = 0) AND copies are left
+            if (taskAssignment[best_expert_i, best_task_j] == 0) and (experts_copies[best_expert_i] != 0):
+
+                #Retrieve union of skills of all experts assigned to T_j and add expert E_i
+                expert_skills = self.currentExpertUnionSkills[best_task_j].union(set(self.experts[best_expert_i]))
+                task_skills = set(self.tasks[best_task_j])   #Get task skills as a set
+                
+                #Compute delta_coverage of current best edge
+                best_edge_coverage = len(expert_skills.intersection(task_skills))/len(task_skills)
+                delta_best = best_edge_coverage - self.currentCoverageList[j]
+
+                #Return if better than 2nd
+                if delta_best >= delta_second:
+                    bestExpertTaskEdge['expert_index'] = best_expert_i
+                    bestExpertTaskEdge['task_index'] = best_task_j
+                    
+                    return delta_best, bestExpertTaskEdge
+   
+                else:
+                    #Update best edge and put back in maxHeap
+                    updated_best_edge = (delta_best, best_expert_i, best_task_j)
+                    heappush(self.maxHeap, updated_best_edge)
+
+
+        return delta_best, bestExpertTaskEdge
 
 
 
@@ -259,7 +292,7 @@ class TeamFormationProblem:
         #Get first best expert-task assignment and delta coverage value
         first_edge = heappop(self.maxHeap)
 
-        deltaCoverage=first_edge[0]
+        deltaCoverage = first_edge[0]
         best_ExpertTaskEdge = {'expert_index': first_edge[1], 'task_index': first_edge[2]}
 
         #Assign edges until there is no more coverage possible or no expert copies left
