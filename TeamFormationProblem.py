@@ -89,7 +89,7 @@ class TeamFormationProblem:
             bestExpertTaskEdge  : best expert task edge
             delta_coverage  : increase in coverage
         '''
-        self.currentCoverageList[bestExpertTaskEdge['expert_index']] += delta_coverage
+        self.currentCoverageList[bestExpertTaskEdge['task_index']] += delta_coverage
         return
 
     
@@ -131,7 +131,7 @@ class TeamFormationProblem:
                     #Compute task coverage with expert added
                     T_j_coverage = len(expert_skills.intersection(task_skills))/len(task_skills)
                     delta_coverage = T_j_coverage - self.currentCoverageList[j]
-                    logging.debug("deltaCoverage={:.1f}, T_j_coverage={}".format(delta_coverage, T_j_coverage))
+                    #logging.debug("deltaCoverage={:.1f}, T_j_coverage={}".format(delta_coverage, T_j_coverage))
 
                     if delta_coverage > max_edge_coverage:
                         max_edge_coverage = delta_coverage
@@ -169,7 +169,7 @@ class TeamFormationProblem:
         deltaCoverage, best_ExpertTaskEdge = self.getBestExpertTaskEdge(taskAssignment_i, expert_copies_list)
 
         #Assign edges until there is no more coverage possible or no expert copies left
-        while (deltaCoverage != 0) and (sum(expert_copies_list) != 0):
+        while (deltaCoverage > 0) and (sum(expert_copies_list) != 0):
 
             #Add edge to assignment
             taskAssignment_i[best_ExpertTaskEdge['expert_index'], best_ExpertTaskEdge['task_index']] = 1
@@ -179,7 +179,6 @@ class TeamFormationProblem:
             expert_copies_list[best_ExpertTaskEdge['expert_index']] -= 1
             self.updateCurrentCoverageList(best_ExpertTaskEdge, deltaCoverage)
             self.updateExpertUnionSkillsList(best_ExpertTaskEdge)
-
             logging.debug("Current Coverage List = {}".format(self.currentCoverageList))
 
             #Get next best assignment and coverage value
@@ -231,11 +230,11 @@ class TeamFormationProblem:
         bestExpertTaskEdge = {'expert_index':None, 'task_index':None}
         delta_best = 0
 
-        while self.maxHeap:
+        while len(self.maxHeap)>1:
             #Pop best edge from maxHeap
             best_edge = heappop(self.maxHeap)
             second_edge = self.maxHeap[0] #Check item now on top
-            delta_second = second_edge[0]
+            delta_second = second_edge[0]*-1
 
             #Compute coverage of top edge - Retrieve expert and task indices of top edge
             best_expert_i, best_task_j  = best_edge[1], best_edge[2]
@@ -249,7 +248,7 @@ class TeamFormationProblem:
                 
                 #Compute delta_coverage of current best edge
                 best_edge_coverage = len(expert_skills.intersection(task_skills))/len(task_skills)
-                delta_best = best_edge_coverage - self.currentCoverageList[j]
+                delta_best = best_edge_coverage - self.currentCoverageList[best_task_j]
 
                 #Return if better than 2nd
                 if delta_best >= delta_second:
@@ -260,9 +259,19 @@ class TeamFormationProblem:
    
                 else:
                     #Update best edge and put back in maxHeap
-                    updated_best_edge = (delta_best, best_expert_i, best_task_j)
+                    updated_best_edge = (delta_best*-1, best_expert_i, best_task_j)
                     heappush(self.maxHeap, updated_best_edge)
 
+        
+        #if only 1 edge is left return it
+        last_edge = self.maxHeap[0] #Check item now on top
+        #Check if this expert is not yet assigned to T_j (A[i,j] = 0) AND copies are left
+        last_expert_i, last_task_j  = last_edge[1], last_edge[2]
+
+        if (taskAssignment[last_expert_i, last_task_j] == 0) and (experts_copies[last_expert_i] != 0):
+            delta_best = last_edge[0]*-1
+            bestExpertTaskEdge['expert_index'] = last_expert_i
+            bestExpertTaskEdge['task_index'] = last_task_j
 
         return delta_best, bestExpertTaskEdge
 
@@ -292,11 +301,11 @@ class TeamFormationProblem:
         #Get first best expert-task assignment and delta coverage value
         first_edge = heappop(self.maxHeap)
 
-        deltaCoverage = first_edge[0]
+        deltaCoverage = first_edge[0]*-1
         best_ExpertTaskEdge = {'expert_index': first_edge[1], 'task_index': first_edge[2]}
 
         #Assign edges until there is no more coverage possible or no expert copies left
-        while (deltaCoverage != 0) and (sum(expert_copies_list) != 0):
+        while (deltaCoverage > 0) and (sum(expert_copies_list) != 0):
             #Add edge to assignment
             taskAssignment_i[best_ExpertTaskEdge['expert_index'], best_ExpertTaskEdge['task_index']] = 1
 
@@ -319,11 +328,14 @@ class TeamFormationProblem:
         
 
 
-    def computeTaskAssigment(self):
+    def computeTaskAssigment(self, lazy_eval=True):
         '''
         Compute a Task Assignment, of experts to tasks.
         Use m thresholds for the maximum load, and call a greedy method for each threshold
         Store this task assignment in self.taskAssignment
+        
+        ARGS:
+            lazy_eval  : Lazy Greedy evaluation, set True as default
         '''
         startTime = time.perf_counter()
         F_max = 0 #store maximum objective value
@@ -331,16 +343,20 @@ class TeamFormationProblem:
 
         for T_i in range(1, self.maxWorkloadThreshold+1):
             logging.info('--------------------------------------------------------------------------------------------------')
-            logging.info("Computing Greedy Task Assignment for threshold max load, T_i={}".format(T_i))
-
             #Create T_i copies of each expert, using a single list to keep track of copies
             experts_copy_list_T_i = [T_i for i in range(self.n)]
-            logging.info("Expert Copy List: {}".format(experts_copy_list_T_i))
 
             #Greedily assign experts to tasks using this expert list
-            taskAssignment_T_i = self.greedyTaskAssignment(experts_copy_list_T_i)       
-            logging.info("Greedy Task Assignment = \n{}".format(taskAssignment_T_i))
+            if lazy_eval:
+                logging.info("Computing Greedy Task Assignment (Lazy Eval) for max load, T_i={}".format(T_i))
+                taskAssignment_T_i = self.lazyGreedyTaskAssignment(experts_copy_list_T_i)       
+                logging.info("Greedy Task Assignment (Lazy Eval): \n{}".format(taskAssignment_T_i))
 
+            else:
+                logging.info("Computing Greedy Task Assignment, for max load, T_i={}".format(T_i))
+                taskAssignment_T_i = self.greedyTaskAssignment(experts_copy_list_T_i) 
+                logging.info("Greedy Task Assignment (regular): \n{}".format(taskAssignment_T_i))
+            
             #Compute Objective: Coverage - T_i
             F_i = sum(self.currentCoverageList) - T_i
             logging.info("F_i = {:.3f}".format(F_i))
@@ -350,10 +366,66 @@ class TeamFormationProblem:
                 self.taskAssignment = taskAssignment_T_i
                 best_T_i = T_i
 
+
         logging.info("Best Task Assignment is for max workload threshold: {}, F_i(max)={:.3f} \n{}".format(best_T_i, F_max, self.taskAssignment))
         
         runTime = time.perf_counter() - startTime
         logging.info("\nTotal Computation time = {:.3f} seconds".format(runTime))
 
         return None
+
+
+    def compareTest_Lazy_Regular_Assignments(self):
+        '''
+        Compare the performance and correctness of both lazy and regular implementations
+        '''
+        lazyRunTime = 0
+        regularRunTime = 0
+
+        equal_assignment_list = []
+        equal_objective_list = []
+
+        for T_i in range(1, self.maxWorkloadThreshold+1):
+            #Create T_i copies of each expert, using a single list to keep track of copies
+            experts_copy_list_T_i = [T_i for i in range(self.n)]
+
+            logging.info("----------Computing Greedy Task Assignment, for max load, T_i={} ---------------".format(T_i))
+            #Run Lazy Evaluation method
+            startTime = time.perf_counter()
+            lazy_taskAssignment_T_i = self.lazyGreedyTaskAssignment(experts_copy_list_T_i) 
+            #Compute Objective: Coverage - T_i
+            lazy_F_i = sum(self.currentCoverageList) - T_i
+            runTime = time.perf_counter() - startTime
+            lazyRunTime += runTime
+            logging.info("Lazy F_i = {:.3f}".format(lazy_F_i))
+
+            experts_copy_list_T_i = [T_i for i in range(self.n)]
+            startTime = time.perf_counter()
+            taskAssignment_T_i = self.greedyTaskAssignment(experts_copy_list_T_i) 
+
+            #Compute Objective: Coverage - T_i
+            F_i = sum(self.currentCoverageList) - T_i
+            runTime = time.perf_counter() - startTime
+            regularRunTime += runTime
+            logging.info("Regular Greedy F_i = {:.3f}".format(F_i))
+
+            if(np.array_equal(lazy_taskAssignment_T_i, taskAssignment_T_i)):
+                equal_assignment_list.append(1)
+            else:
+                equal_assignment_list.append(0)
+
+            if lazy_F_i == F_i:
+                equal_objective_list.append(1)
+            else:
+                equal_objective_list.append(0)
+
+            logging.info("============================================================================================")
+        
+        if sum(equal_objective_list) == self.maxWorkloadThreshold and sum(equal_assignment_list) == self.maxWorkloadThreshold:
+            logging.info("\nAll {} Assignment Matrices Equal; All {} ObjectivesEqual".format(sum(equal_assignment_list), sum(equal_objective_list)))
+        else:
+            logging.info("\nAssignment Matrices NOT Equal: {}, Objectives NOT Equal".format(equal_assignment_list, equal_objective_list))
+
+        logging.info("\nTotal Regular Greedy runtime = {:.3f} seconds".format(regularRunTime))
+        logging.info("\nTotal Lazy Evaluation runtime = {:.3f} seconds".format(lazyRunTime))
 
