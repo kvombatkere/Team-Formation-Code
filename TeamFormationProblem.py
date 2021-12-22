@@ -1,4 +1,4 @@
-## Implementation of Framework for Team Formation problem
+## Implementation for Team Formation problem
 ## Balancing Task Coverage vs. Maximum Expert Load
 ## Karan Vombatkere, Dec 2021
 
@@ -14,31 +14,36 @@ class TeamFormationProblem:
     '''
     Class to implement base framework for Team Formation problem
     The goal is to optimally Balance Task Coverage vs. Maximum Expert Load
+    Implement lazy greedy evaluation using a max heap to create Team Assignment
 
     Parameters
-    ----------
-        m_tasks : list of m tasks; each task is a list of skills
-        n_experts : list of n experts; each expert is a list of skills
-    ----------
+    ----------------------------------------------------------------------
+        m_tasks : list of m tasks; each task is a list of skills (stored as self.tasks)
+        n_experts : list of n experts; each expert is a list of skills (stored as self.experts)
+    
+    Internal variables
+    ----------------------------------------------------------------------
     self.taskAssignment  : Created (n x m) matrix to store task assignment
                             n rows represent the n experts, m columns are for m tasks
+    self.currentCoverageList    : list of coverages of each task (length m)
+    self.currentExpertUnionSkills   : list of sets of union of skills of experts assigned to tasks (length m)
+    self.maxHeap    : max heap for ordering expert-task edges (size n x m)
+    self.maxWorkloadThreshold   : thresholds for max expert workload to check upto
     '''
 
-
-    def __init__(self, m_tasks, n_experts, max_workload_threshold=3):
+    def __init__(self, m_tasks, n_experts, max_workload_threshold=2):
         '''
         Initialize problem instance with m tasks, n experts
         ARGS:
             m_tasks : list of m tasks; each task is a list of skills
             n_experts : list of n experts; each expert is a list of skills
-            max_workload_threshold: maximum workload threshold to attempt to solve for, default=3
+            max_workload_threshold: maximum workload threshold to attempt to solve for, default=2 for testing
         '''
         self.tasks = m_tasks
         self.m = len(self.tasks)
 
         self.experts = n_experts
         self.n = len(self.experts)
-
         self.maxWorkloadThreshold = max_workload_threshold
 
         #self.taskAssignment = np.zeros((self.n, self.m))
@@ -265,7 +270,6 @@ class TeamFormationProblem:
                     updated_best_edge = (delta_best*-1, best_expert_i, best_task_j)
                     heappush(self.maxHeap, updated_best_edge)
 
-        
         #if only 1 edge is left return it
         last_edge = self.maxHeap[0] #Check item now on top
         #Check if this expert is not yet assigned to T_j (A[i,j] = 0) AND copies are left
@@ -397,17 +401,18 @@ class TeamFormationProblem:
             #Run Lazy Evaluation method
             startTime = time.perf_counter()
             lazy_taskAssignment_T_i = self.lazyGreedyTaskAssignment(experts_copy_list_T_i) 
-            #Compute Objective: Coverage - T_i
+            
             lazy_F_i = sum(self.currentCoverageList) - T_i
             runTime = time.perf_counter() - startTime
             lazyRunTime += runTime
             logging.info("Lazy F_i = {:.3f}".format(lazy_F_i))
 
+
+            #Run regular greedy method
             experts_copy_list_T_i = [T_i for i in range(self.n)]
             startTime = time.perf_counter()
             taskAssignment_T_i = self.greedyTaskAssignment(experts_copy_list_T_i) 
 
-            #Compute Objective: Coverage - T_i
             F_i = sum(self.currentCoverageList) - T_i
             runTime = time.perf_counter() - startTime
             regularRunTime += runTime
@@ -433,7 +438,6 @@ class TeamFormationProblem:
 
         logging.info("\nTotal Regular Greedy runtime = {:.3f} seconds".format(regularRunTime))
         logging.info("\nTotal Lazy Evaluation runtime = {:.3f} seconds".format(lazyRunTime))
-
         logging.info("\nLazy Evaluation runtime improvement = {:.1f}x".format(regularRunTime/lazyRunTime))
  
         return None
