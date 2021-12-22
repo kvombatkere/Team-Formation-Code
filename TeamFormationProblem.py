@@ -369,7 +369,6 @@ class TeamFormationProblem:
                 self.taskAssignment = taskAssignment_T_i
                 best_T_i = T_i
 
-
         logging.info("Best Task Assignment is for max workload threshold: {}, F_i(max)={:.3f} \n{}".format(best_T_i, F_max, self.taskAssignment))
         
         runTime = time.perf_counter() - startTime
@@ -424,6 +423,7 @@ class TeamFormationProblem:
 
             logging.info("============================================================================================")
         
+
         if sum(equal_objective_list) == self.maxWorkloadThreshold and sum(equal_assignment_list) == self.maxWorkloadThreshold:
             logging.info("\nAll {} Assignment Matrices Equal; All {} Objectives Equal".format(sum(equal_assignment_list), sum(equal_objective_list)))
         else:
@@ -433,4 +433,5 @@ class TeamFormationProblem:
         logging.info("\nTotal Lazy Evaluation runtime = {:.3f} seconds".format(lazyRunTime))
 
         logging.info("\nLazy Evaluation runtime improvement = {:.1f}x".format(regularRunTime/lazyRunTime))
-
+ 
+        return None
