@@ -361,6 +361,9 @@ class TeamFormationProblem:
             F_i = sum(self.currentCoverageList) - T_i
             logging.info("F_i = {:.3f}".format(F_i))
 
+            if F_i < 0:
+                break
+
             if F_i > F_max:
                 F_max = F_i
                 self.taskAssignment = taskAssignment_T_i
@@ -422,10 +425,12 @@ class TeamFormationProblem:
             logging.info("============================================================================================")
         
         if sum(equal_objective_list) == self.maxWorkloadThreshold and sum(equal_assignment_list) == self.maxWorkloadThreshold:
-            logging.info("\nAll {} Assignment Matrices Equal; All {} ObjectivesEqual".format(sum(equal_assignment_list), sum(equal_objective_list)))
+            logging.info("\nAll {} Assignment Matrices Equal; All {} Objectives Equal".format(sum(equal_assignment_list), sum(equal_objective_list)))
         else:
             logging.info("\nAssignment Matrices NOT Equal: {}, Objectives NOT Equal".format(equal_assignment_list, equal_objective_list))
 
         logging.info("\nTotal Regular Greedy runtime = {:.3f} seconds".format(regularRunTime))
         logging.info("\nTotal Lazy Evaluation runtime = {:.3f} seconds".format(lazyRunTime))
+
+        logging.info("\nLazy Evaluation runtime improvement = {:.1f}x".format(regularRunTime/lazyRunTime))
 
