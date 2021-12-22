@@ -251,9 +251,6 @@ class TeamFormationProblem:
         #Initialize current coverage list
         self.currentCoverageList = [0 for i in range(self.m)]
 
-        #Initialize expert-task list as an empty list of lists
-        self.currentExpertTaskList = [[] for i in range(self.m)]
-
         #Initialize expert union skills list as an empty list of sets
         self.currentExpertUnionSkills = [set() for j in range(self.m)]
         
@@ -268,9 +265,8 @@ class TeamFormationProblem:
             #self.displayTaskAssignment(taskAssignment_i)
 
             ##Perform updates 
-
             #Decrement expert copy
-            expert_copies_list[best_ExpertTaskEdge[0]] -= 1
+            expert_copies_list[best_ExpertTaskEdge['expert_index']] -= 1
             
             #Update current coverage list
             self.updateCurrentCoverageList(best_ExpertTaskEdge, deltaCoverage)
@@ -286,8 +282,8 @@ class TeamFormationProblem:
             logging.debug("deltaCoverage={:.1f}, best_ExpertTaskEdge={}".format(deltaCoverage, best_ExpertTaskEdge))
         
         
-        #Update current coverage list
-        self.updateCurrentCoverageList(best_ExpertTaskEdge, deltaCoverage)
+        #Update current coverage list if
+        #self.updateCurrentCoverageList(best_ExpertTaskEdge, deltaCoverage)
 
         runTime = time.perf_counter() - startTime
         logging.debug("Greedy Task Assignment computation time = {:.1f} seconds".format(runTime))
