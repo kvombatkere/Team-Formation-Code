@@ -43,8 +43,7 @@ class TeamFormationProblem:
         #self.taskAssignment = np.zeros((self.n, self.m))
         logging.info('Team Formation Problem initialized with {} tasks and {} experts'.format(self.m,self.n))
 
-    
-    
+
     def getExpertsAssignedToTask(self, taskAssignment, task_index):
         '''
         Given a taskAssignment, and task index get the experts currently assigned to this task
@@ -63,8 +62,101 @@ class TeamFormationProblem:
                 assigned_experts_indices.append(expert_index)
 
         return assigned_experts_indices
-    
 
+
+    def getExpertSkillSet(self, expertIndices):
+        '''
+        Given a list of expert indices, return union of all expert skills
+        ARGS:
+            expertIndices   : list of indices of experts
+        RETURN:
+            expert_skillset    : Union of skills of all experts, returned as a set
+        '''
+        expert_skillset = set()
+        for expert_index in expertIndices:
+            expert_i_skills = set(self.experts[expert_index])
+            expert_skillset = expert_skillset.union(expert_i_skills)
+
+        return expert_skillset
+
+
+    def singleTaskCoverage(self, taskAssignment, task_index):
+        '''
+        Given a taskAssignment, compute the task coverage of a single task 
+        ARGS:
+            taskAssignment  : current task assigment
+            task_index  : index of task in original list m_tasks
+        RETURN:
+            task_coverage   : task coverage of a single task
+        '''
+        #Get union of skills of experts assigned to task
+        task_assigned_experts_indices = self.getExpertsAssignedToTask(taskAssignment, task_index)
+        all_expert_skills = self.getExpertSkillSet(task_assigned_experts_indices)
+
+        task_skills = set(self.tasks[task_index])
+        logging.debug("Single Task Coverage Debug: task index={}, task skills={}, expert skills={}".format(task_index, task_skills, all_expert_skills))
+        
+        #Compute coverage
+        task_coverage = len(all_expert_skills.intersection(task_skills))/len(task_skills)
+        
+        return task_coverage
+
+
+
+    def maximumExpertLoad(self, taskAssignment):
+        '''
+        Given a taskAssignment, compute the maximum expert load
+        ARGS:
+            taskAssignment  : current task assigment
+        RETURN: 
+            max_load    : Maximum expert workload
+        '''
+        max_load = 0
+
+        for i in range(self.n):
+            expert_i_tasks = taskAssignment[i,:]
+            expert_i_load = np.sum(expert_i_tasks)
+            
+            if expert_i_load > max_load:
+                max_load = expert_i_load
+                
+                if max_load == self.m:
+                    return max_load
+
+        return max_load
+
+
+    def computeTotalTaskCoverage(self, taskAssigment = None, list_flag = True):
+        '''
+        Given a taskAssignment, compute the total task coverage of the assigment
+        ARGS:
+            taskAssignment  : current task assigment
+            list_flag  : flag to determine whether to output total coverage or list
+        RETURN:
+            total_task_coverage_value   : total task coverage across all tasks
+            total_task_coverage_list    : list of all m task coverage values
+        '''
+        if taskAssigment is not None:
+            task_assigment = taskAssigment
+        else:
+            task_assigment = self.taskAssignment
+        
+
+        total_task_coverage_value = 0
+        total_task_coverage_list = []
+
+        for index_task, t in enumerate(self.tasks):
+            cov = self.singleTaskCoverage(task_assigment, index_task)
+            total_task_coverage_value += cov
+            total_task_coverage_list.append(cov)
+
+        if list_flag:
+            return total_task_coverage_list
+        
+        else:
+            return total_task_coverage_value
+
+    
     def updateCurrentCoverageList(self, bestExpertTaskEdge, delta_coverage):
         '''
         Given a bestExpertTaskEdge, update the current coverage list
@@ -76,7 +168,6 @@ class TeamFormationProblem:
         return
 
     
-
     def updateExpertUnionSkillsList(self, bestExpertTaskEdge):
         '''
         Given a bestExpertTaskEdge, update the expert union skills list
@@ -144,7 +235,6 @@ class TeamFormationProblem:
 
 
 
-
     def greedyTaskAssignment(self, expert_copies_list):
         '''
         Greedily compute a Task Assignment given a set of tasks and experts
@@ -196,7 +286,6 @@ class TeamFormationProblem:
         logging.debug("Greedy Task Assignment computation time = {:.1f} seconds".format(runTime))
 
         return taskAssignment_i
-
 
 
     def computeTaskAssigment(self):
