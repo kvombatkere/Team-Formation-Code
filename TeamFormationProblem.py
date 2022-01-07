@@ -364,7 +364,7 @@ class TeamFormationProblem:
         Generates a list of random indices, by uniformly sampling self.expertTaskEdgeList
         '''
         randomIndicesList = []
-        s = int(len(self.expertTaskEdgeList)/4)
+        s = int(len(self.expertTaskEdgeList)/2)
         i = 0
 
         while i < s:
@@ -375,6 +375,7 @@ class TeamFormationProblem:
                 i+=1
 
         return sorted(randomIndicesList)
+
 
 
     def getStochasticGreedyExpertTaskEdge(self, taskAssignment, experts_copies):
@@ -388,13 +389,14 @@ class TeamFormationProblem:
             max_edge_coverage  : maximum value of change in task coverage by adding edge (i,j)
             bestExpertTaskEdge  : indices of expert and task as a dictionary
         '''
-        bestExpertTaskEdge = {'expert_index':None, 'task_index':None}        
+        bestExpertTaskEdge = {'expert_index':None, 'task_index':None}
+        delta_coverage = 0      
        
         #Sample random edges from list - note that the list is sorted in increasing order of indices i.e. decreasing coverages
         randomSampleIndices = self.getRandomIndexSample()
 
-        for i in randomSampleIndices[:-1]:
-            expertTaskEdge_i = self.expertTaskEdgeList[i]
+        for indx, index_val in enumerate(randomSampleIndices[:-1]):
+            expertTaskEdge_i = self.expertTaskEdgeList[index_val]
 
             #Check if this expert is not yet assigned to T_j (A[i,j] = 0) AND copies are left
             if (taskAssignment[expertTaskEdge_i[1], expertTaskEdge_i[2]] == 0) and (experts_copies[expertTaskEdge_i[1]] != 0):
@@ -408,10 +410,10 @@ class TeamFormationProblem:
                 delta_coverage = edge_coverage - self.currentCoverageList[expertTaskEdge_i[2]]
 
                 #Update coverage
-                self.expertTaskEdgeList[i][0] = delta_coverage
+                self.expertTaskEdgeList[index_val][0] = delta_coverage
 
                 #coverage of next edge in sample
-                delta_coverage_e_prime = self.expertTaskEdgeList[i+1][0]
+                delta_coverage_e_prime = self.expertTaskEdgeList[randomSampleIndices[indx+1]][0]
                 
                 if delta_coverage >= delta_coverage_e_prime:
                     bestExpertTaskEdge['expert_index'] = expertTaskEdge_i[1]
@@ -556,7 +558,7 @@ class TeamFormationProblem:
             #Run regular greedy method
             experts_copy_list_T_i = [T_i for i in range(self.n)]
             startTime = time.perf_counter()
-            taskAssignment_T_i = self.greedyTaskAssignment(experts_copy_list_T_i) 
+            taskAssignment_T_i = self.stochasticGreedyTaskAssignment(experts_copy_list_T_i) 
 
             F_i = sum(self.currentCoverageList) - T_i
             runTime = time.perf_counter() - startTime
