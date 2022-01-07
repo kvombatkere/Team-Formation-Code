@@ -199,6 +199,68 @@ class TeamFormationProblem:
 
         return taskAssignment_i
 
+    
+
+    def baseline_Random(self, expert_copies_list):
+        '''
+        Baseline algorithm to compute task assignment. Uses random task assignment for each expert
+        ARGS:
+            expert_copies_list : list of number of copies available of experts
+        
+        RETURN:
+            taskAssignment  : task assigment, using random assignment
+        '''
+        startTime = time.perf_counter()
+
+        #Create empty task assigment matrix
+        taskAssignment_i = np.zeros((self.n, self.m), dtype=np.int8)
+
+        #Initialize current coverage list
+        self.currentCoverageList = [0 for i in range(self.m)]
+
+        #Initialize expert union skills list as an empty list of sets
+        self.currentExpertUnionSkills = [set() for j in range(self.m)]
+
+        #Assign each expert to random tasks
+        for i, E_i in enumerate(self.experts):
+            
+            expert_copies_left = expert_copies_list[i]
+            counter = 0
+
+            while expert_copies_left > 0 and counter < self.m:
+
+                j = np.random.randint(0, self.m)
+                counter += 1
+                
+                #Check if this expert is not yet assigned to T_j (A[i,j] = 0) AND task is not already fully covered
+                if (taskAssignment_i[i,j] == 0) and self.currentCoverageList[j] != 1:
+                    #Get Task
+                    T_j = self.tasks[j]
+                    
+                    #Retrieve union of skills of all experts assigned to T_j and add expert E_i
+                    expert_skills = self.currentExpertUnionSkills[j].union(set(E_i))
+                    task_skills = set(T_j)    #Get task skills as a set
+                    
+                    #Compute task coverage with expert added
+                    T_j_coverage = len(expert_skills.intersection(task_skills))/len(task_skills)
+                    delta_coverage = T_j_coverage - self.currentCoverageList[j]
+
+                    #Decrement copy
+                    expert_copies_left -= 1
+
+                    #Add edge to task assignment
+                    expertTaskEdge = {'expert_index':i, 'task_index':j}
+
+                    taskAssignment_i[expertTaskEdge['expert_index'], expertTaskEdge['task_index']] = 1
+
+                    #Update current coverage list and expert union skills list
+                    self.updateCurrentCoverageList(expertTaskEdge, delta_coverage)
+                    self.updateExpertUnionSkillsList(expertTaskEdge)
+                    logging.debug("Current Coverage List = {}".format(self.currentCoverageList))
+
+
+        return taskAssignment_i
+
 
 
     def initializeMaxHeap(self):
@@ -481,13 +543,14 @@ class TeamFormationProblem:
         
 
 
-    def computeTaskAssigment(self, lazy_eval=True):
+    def computeTaskAssigment(self, lazy_eval=True, baselines=['random']):
         '''
         Compute a Task Assignment, of experts to tasks.
         Use m thresholds for the maximum load, and call a greedy method for each threshold
         Store this task assignment in self.taskAssignment
         ARGS:
             lazy_eval  : Lazy Greedy evaluation, set True as default
+            baselines   : List of baselines to run, must be a list consisting of one or more of: ['random', 'no_update_greedy']
         '''
         startTime = time.perf_counter()
         F_max = 0 #store maximum objective value
@@ -520,6 +583,22 @@ class TeamFormationProblem:
                 F_max = F_i
                 self.taskAssignment = taskAssignment_T_i
                 best_T_i = T_i
+
+
+            #Run baselines:
+            for b in baselines:
+                if b == 'random':
+                    #Create T_i copies of each expert, using a single list to keep track of copies
+                    experts_copy_list_T_i = [T_i for i in range(self.n)]
+
+                    logging.info("Baseline Random Task Assignment for max load, T_i={}".format(T_i))
+                    random_taskAssignment_T_i = self.baseline_Random(experts_copy_list_T_i)       
+                    logging.info("Baseline Random Task Assignment: \n{}".format(random_taskAssignment_T_i))
+
+                    #Compute Objective: Coverage - T_i
+                    random_F_i = sum(self.currentCoverageList) - T_i
+                    logging.info("Baseline Random F_i = {:.3f}".format(random_F_i))
+
 
         logging.info("Best Task Assignment is for max workload threshold: {}, F_i(max)={:.3f} \n{}".format(best_T_i, F_max, self.taskAssignment))
         
