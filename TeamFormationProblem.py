@@ -5,7 +5,7 @@
 #Import and logging config
 import numpy as np
 from heapq import heappop, heappush, heapify
-import time
+import time, random
 import logging
 logging.basicConfig(format='%(asctime)s |%(levelname)s: %(message)s', level=logging.INFO)
 
@@ -223,7 +223,6 @@ class TeamFormationProblem:
         return
 
 
-
     def getLazyExpertTaskEdge(self, taskAssignment, experts_copies):
         '''
         Lazy greedy compute the best expert-task edge (assigment) using self.maxHeap
@@ -328,7 +327,153 @@ class TeamFormationProblem:
         
 
         runTime = time.perf_counter() - startTime
-        logging.debug("Greedy Task Assignment computation time = {:.1f} seconds".format(runTime))
+        logging.debug("Lazy Greedy Task Assignment computation time = {:.1f} seconds".format(runTime))
+
+        return taskAssignment_i
+        
+
+
+    def initializeEdgeList(self):
+        '''
+        Initialize the edge list for stochastic greedy evaluation
+        Creates and updates self.expertTaskEdgeList with tuples of (coverage, expert, task)
+        '''
+        self.expertTaskEdgeList = []
+
+        for i, E_i in enumerate(self.experts):
+            for j, T_j in enumerate(self.tasks):
+                expert_skills = set(E_i)    #Get expert E_i skills as set
+                task_skills = set(T_j)    #Get task T_j skills as set
+                
+                #Compute initial coverage of E_i-T_J edge
+                edge_coverage = len(expert_skills.intersection(task_skills))/len(task_skills)
+                edge_tuple = [edge_coverage, i, j]
+
+                self.expertTaskEdgeList.append(edge_tuple)
+
+
+        #sort list by coverages
+        self.expertTaskEdgeList.sort(key=lambda x: x[0], reverse=True)
+        
+        return
+
+
+
+    def getRandomIndexSample(self):
+        '''
+        Generates a list of random indices, by uniformly sampling self.expertTaskEdgeList
+        '''
+        randomIndicesList = []
+        s = int(len(self.expertTaskEdgeList)/4)
+        i = 0
+
+        while i < s:
+            randomIndex = random.randint(0, len(self.expertTaskEdgeList))
+            
+            if randomIndex not in randomIndicesList:
+                randomIndicesList.append(randomIndex)
+                i+=1
+
+        return sorted(randomIndicesList)
+
+
+    def getStochasticGreedyExpertTaskEdge(self, taskAssignment, experts_copies):
+        '''
+        Stochastic greedy compute the best expert-task edge (assigment) using self.maxHeap
+        ARGS:
+            taskAssignment : current task assigment
+            experts_copies  : current list of number of copies available of experts
+        
+        RETURN:
+            max_edge_coverage  : maximum value of change in task coverage by adding edge (i,j)
+            bestExpertTaskEdge  : indices of expert and task as a dictionary
+        '''
+        bestExpertTaskEdge = {'expert_index':None, 'task_index':None}        
+       
+        #Sample random edges from list - note that the list is sorted in increasing order of indices i.e. decreasing coverages
+        randomSampleIndices = self.getRandomIndexSample()
+
+        for i in randomSampleIndices[:-1]:
+            expertTaskEdge_i = self.expertTaskEdgeList[i]
+
+            #Check if this expert is not yet assigned to T_j (A[i,j] = 0) AND copies are left
+            if (taskAssignment[expertTaskEdge_i[1], expertTaskEdge_i[2]] == 0) and (experts_copies[expertTaskEdge_i[1]] != 0):
+
+                #Retrieve union of skills of all experts assigned to T_j and add expert E_i
+                expert_skills = self.currentExpertUnionSkills[expertTaskEdge_i[2]].union(set(self.experts[expertTaskEdge_i[1]]))
+                task_skills = set(self.tasks[expertTaskEdge_i[2]])   #Get task skills as a set
+                
+                #Compute delta_coverage of edge
+                edge_coverage = len(expert_skills.intersection(task_skills))/len(task_skills)
+                delta_coverage = edge_coverage - self.currentCoverageList[expertTaskEdge_i[2]]
+
+                #Update coverage
+                self.expertTaskEdgeList[i][0] = delta_coverage
+
+                #coverage of next edge in sample
+                delta_coverage_e_prime = self.expertTaskEdgeList[i+1][0]
+                
+                if delta_coverage >= delta_coverage_e_prime:
+                    bestExpertTaskEdge['expert_index'] = expertTaskEdge_i[1]
+                    bestExpertTaskEdge['task_index'] = expertTaskEdge_i[2]
+
+                    #Sort
+                    self.expertTaskEdgeList.sort(key=lambda x: x[0], reverse=True)
+
+                    return delta_coverage, bestExpertTaskEdge
+
+        
+        #Return last edge
+        bestExpertTaskEdge['expert_index'] = expertTaskEdge_i[1]
+        bestExpertTaskEdge['task_index'] = expertTaskEdge_i[2]
+        self.expertTaskEdgeList.sort(key=lambda x: x[0], reverse=True)
+
+        return delta_coverage, bestExpertTaskEdge
+
+
+
+    def stochasticGreedyTaskAssignment(self, expert_copies_list):
+        '''
+        Stochastic Greedy compute task assignment. Uses similar framework as greedyTaskAssignment() but with self.maxHeap to order edges
+        ARGS:
+            expert_copies_list : list of number of copies available of experts
+        
+        RETURN:
+            taskAssignment  : greedy task assigment, with lazy evaluation
+        '''
+        startTime = time.perf_counter()
+        #First initialize edge list to store all expert-task edges
+        self.initializeEdgeList()
+
+        #Create empty task assigment matrix
+        taskAssignment_i = np.zeros((self.n, self.m), dtype=np.int8)
+
+        #Initialize current coverage list and expert union skills list as an empty list of sets
+        self.currentCoverageList = [0 for i in range(self.m)]
+        self.currentExpertUnionSkills = [set() for j in range(self.m)]
+        
+        #Get first best expert-task assignment and delta coverage value
+        deltaCoverage, best_ExpertTaskEdge = self.getStochasticGreedyExpertTaskEdge(taskAssignment_i, expert_copies_list)
+
+        #Assign edges until there is no more coverage possible or no expert copies left
+        while (deltaCoverage > 0) and (sum(expert_copies_list) != 0):
+            #Add edge to assignment
+            taskAssignment_i[best_ExpertTaskEdge['expert_index'], best_ExpertTaskEdge['task_index']] = 1
+
+            ##Perform updates 
+            #Decrement expert copy, Update current coverage list and expert union skills list
+            expert_copies_list[best_ExpertTaskEdge['expert_index']] -= 1
+            self.updateCurrentCoverageList(best_ExpertTaskEdge, deltaCoverage)
+            self.updateExpertUnionSkillsList(best_ExpertTaskEdge)
+            logging.debug("Current Coverage List = {}".format(self.currentCoverageList))
+
+            #Get next best assignment and coverage value
+            deltaCoverage, best_ExpertTaskEdge = self.getStochasticGreedyExpertTaskEdge(taskAssignment_i, expert_copies_list)
+            logging.debug("deltaCoverage={:.1f}, best_ExpertTaskEdge={}".format(deltaCoverage, best_ExpertTaskEdge))
+        
+
+        runTime = time.perf_counter() - startTime
+        logging.debug("Stochastic Greedy Task Assignment computation time = {:.1f} seconds".format(runTime))
 
         return taskAssignment_i
         
