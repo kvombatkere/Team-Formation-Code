@@ -364,7 +364,7 @@ class TeamFormationProblem:
         Generates a list of random indices, by uniformly sampling self.expertTaskEdgeList
         '''
         randomIndicesList = []
-        s = int(len(self.expertTaskEdgeList)/2)
+        s = int(len(self.expertTaskEdgeList)/10)
         i = 0
 
         while i < s:
@@ -530,15 +530,16 @@ class TeamFormationProblem:
 
 
 
-    def compareTest_Lazy_Regular_Assignments(self):
+    def compareTest_Lazy_Stochastic_Assignments(self):
         '''
-        Compare the performance and correctness of both lazy and regular implementations
+        Compare the performance and correctness of both lazy and stochastic greedy implementations
         '''
         lazyRunTime = 0
-        regularRunTime = 0
+        stochasticRunTime = 0
 
         equal_assignment_list = []
         equal_objective_list = []
+        stochastic_error_list = []
 
         for T_i in range(1, self.maxWorkloadThreshold+1):
             #Create T_i copies of each expert, using a single list to keep track of copies
@@ -562,8 +563,8 @@ class TeamFormationProblem:
 
             F_i = sum(self.currentCoverageList) - T_i
             runTime = time.perf_counter() - startTime
-            regularRunTime += runTime
-            logging.info("Regular Greedy F_i = {:.3f}".format(F_i))
+            stochasticRunTime += runTime
+            logging.info("Stochastic Greedy F_i = {:.3f}".format(F_i))
 
             if(np.array_equal(lazy_taskAssignment_T_i, taskAssignment_T_i)):
                 equal_assignment_list.append(1)
@@ -575,6 +576,9 @@ class TeamFormationProblem:
             else:
                 equal_objective_list.append(0)
 
+            stochastic_error_T_i = abs(lazy_F_i - F_i)/lazy_F_i
+            stochastic_error_list.append(stochastic_error_T_i)
+
             logging.info("============================================================================================")
         
 
@@ -582,9 +586,10 @@ class TeamFormationProblem:
             logging.info("\nAll {} Assignment Matrices Equal; All {} Objectives Equal".format(sum(equal_assignment_list), sum(equal_objective_list)))
         else:
             logging.info("\nAssignment Matrices NOT Equal: {}, Objectives NOT Equal".format(equal_assignment_list, equal_objective_list))
+        logging.info("\nMean Stochastic Greedy percentage error = {:.2f} %".format(sum(stochastic_error_list)/len(stochastic_error_list)*100))
 
-        logging.info("\nTotal Regular Greedy runtime = {:.3f} seconds".format(regularRunTime))
+        logging.info("\n\nTotal Stochastic Greedy runtime = {:.3f} seconds".format(stochasticRunTime))
         logging.info("\nTotal Lazy Evaluation runtime = {:.3f} seconds".format(lazyRunTime))
-        logging.info("\nLazy Evaluation runtime improvement = {:.1f}x".format(regularRunTime/lazyRunTime))
+        logging.info("\nLazy Evaluation runtime improvement = {:.1f}x".format(stochasticRunTime/lazyRunTime))
  
         return None
