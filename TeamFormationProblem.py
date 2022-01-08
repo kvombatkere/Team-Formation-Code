@@ -259,8 +259,64 @@ class TeamFormationProblem:
                     logging.debug("Current Coverage List = {}".format(self.currentCoverageList))
 
 
+        runTime = time.perf_counter() - startTime
+        logging.debug("Baseline Random Task Assignment computation time = {:.1f} seconds".format(runTime))
+
         return taskAssignment_i
 
+
+    def baseline_NoUpdateGreedy(self, expert_copies_list):
+        '''
+        Baseline algorithm to compute task assignment. Uses max heap without any updates
+        ARGS:
+            expert_copies_list : list of number of copies available of experts
+        
+        RETURN:
+            taskAssignment  : task assigment
+        '''
+        startTime = time.perf_counter()
+        #First initialize maxheap to store edge coverages in self.maxHeap
+        self.initializeMaxHeap()
+        deltaCoverage = 1
+
+        #Create empty task assigment matrix
+        taskAssignment_i = np.zeros((self.n, self.m), dtype=np.int8)
+
+        #Initialize current coverage list and expert union skills list as an empty list of sets
+        self.currentCoverageList = [0 for i in range(self.m)]
+        self.currentExpertUnionSkills = [set() for j in range(self.m)]
+        
+        #Assign edges from heap until there is no more coverage possible or no expert copies left
+        while len(self.maxHeap) > 0 and (deltaCoverage > 0) and (sum(expert_copies_list) != 0):
+            #Pop top edge from maxHeap
+            top_edge = heappop(self.maxHeap)
+            top_ExpertTaskEdge = {'expert_index': top_edge[1], 'task_index': top_edge[2]}
+
+            if (expert_copies_list[top_ExpertTaskEdge['expert_index']] != 0) and (taskAssignment_i[top_ExpertTaskEdge['expert_index'], 
+                                                                                                        top_ExpertTaskEdge['task_index']] == 0):
+                
+                #Retrieve union of skills of all experts assigned to T_j and add expert E_i
+                expert_skills = self.currentExpertUnionSkills[top_ExpertTaskEdge['task_index']].union(set(self.experts[top_ExpertTaskEdge['expert_index']]))
+                task_skills = set(self.tasks[top_ExpertTaskEdge['task_index']])   #Get task skills as a set
+                
+                #Compute delta_coverage of current best edge
+                best_edge_coverage = len(expert_skills.intersection(task_skills))/len(task_skills)
+                deltaCoverage = best_edge_coverage - self.currentCoverageList[top_ExpertTaskEdge['task_index']]
+
+                #Add edge to assignment
+                taskAssignment_i[top_ExpertTaskEdge['expert_index'], top_ExpertTaskEdge['task_index']] = 1
+
+                #Decrement expert copy, Update current coverage list and expert union skills list
+                expert_copies_list[top_ExpertTaskEdge['expert_index']] -= 1
+                self.updateCurrentCoverageList(top_ExpertTaskEdge, deltaCoverage)
+                self.updateExpertUnionSkillsList(top_ExpertTaskEdge)
+                logging.debug("Current Coverage List = {}".format(self.currentCoverageList))
+
+
+        runTime = time.perf_counter() - startTime
+        logging.debug("Baseline No Update Greedy Task Assignment computation time = {:.1f} seconds".format(runTime))
+
+        return taskAssignment_i
 
 
     def initializeMaxHeap(self):
@@ -543,7 +599,7 @@ class TeamFormationProblem:
         
 
 
-    def computeTaskAssigment(self, lazy_eval=True, baselines=['random']):
+    def computeTaskAssigment(self, lazy_eval=True, baselines=['random', 'no_update_greedy']):
         '''
         Compute a Task Assignment, of experts to tasks.
         Use m thresholds for the maximum load, and call a greedy method for each threshold
@@ -598,6 +654,18 @@ class TeamFormationProblem:
                     #Compute Objective: Coverage - T_i
                     random_F_i = sum(self.currentCoverageList) - T_i
                     logging.info("Baseline Random F_i = {:.3f}".format(random_F_i))
+
+                if b == 'no_update_greedy':
+                    #Create T_i copies of each expert, using a single list to keep track of copies
+                    experts_copy_list_T_i = [T_i for i in range(self.n)]
+
+                    logging.info("Baseline No Update Greedy Task Assignment for max load, T_i={}".format(T_i))
+                    NUG_taskAssignment_T_i = self.baseline_NoUpdateGreedy(experts_copy_list_T_i)       
+                    logging.info("Baseline No Update Greedy Task Assignment: \n{}".format(NUG_taskAssignment_T_i))
+
+                    #Compute Objective: Coverage - T_i
+                    NUG_F_i = sum(self.currentCoverageList) - T_i
+                    logging.info("Baseline No Update Greedy F_i = {:.3f}".format(NUG_F_i))
 
 
         logging.info("Best Task Assignment is for max workload threshold: {}, F_i(max)={:.3f} \n{}".format(best_T_i, F_max, self.taskAssignment))
