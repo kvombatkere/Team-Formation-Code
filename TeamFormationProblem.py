@@ -287,21 +287,20 @@ class TeamFormationProblem:
         self.currentExpertUnionSkills = [set() for j in range(self.m)]
         
         #Assign edges from heap until there is no more coverage possible or no expert copies left
-        while len(self.maxHeap) > 0 and (deltaCoverage > 0) and (sum(expert_copies_list) != 0):
+        while len(self.maxHeap) > 0 and (sum(expert_copies_list) != 0):
             #Pop top edge from maxHeap
             top_edge = heappop(self.maxHeap)
             top_ExpertTaskEdge = {'expert_index': top_edge[1], 'task_index': top_edge[2]}
 
-            if (expert_copies_list[top_ExpertTaskEdge['expert_index']] != 0) and (taskAssignment_i[top_ExpertTaskEdge['expert_index'], 
-                                                                                                        top_ExpertTaskEdge['task_index']] == 0):
+            if (expert_copies_list[top_ExpertTaskEdge['expert_index']] != 0):
                 
                 #Retrieve union of skills of all experts assigned to T_j and add expert E_i
                 expert_skills = self.currentExpertUnionSkills[top_ExpertTaskEdge['task_index']].union(set(self.experts[top_ExpertTaskEdge['expert_index']]))
                 task_skills = set(self.tasks[top_ExpertTaskEdge['task_index']])   #Get task skills as a set
                 
-                #Compute delta_coverage of current best edge
-                best_edge_coverage = len(expert_skills.intersection(task_skills))/len(task_skills)
-                deltaCoverage = best_edge_coverage - self.currentCoverageList[top_ExpertTaskEdge['task_index']]
+                #Compute delta_coverage of current edge
+                edge_coverage = len(expert_skills.intersection(task_skills))/len(task_skills)
+                deltaCoverage = edge_coverage - self.currentCoverageList[top_ExpertTaskEdge['task_index']]
 
                 #Add edge to assignment
                 taskAssignment_i[top_ExpertTaskEdge['expert_index'], top_ExpertTaskEdge['task_index']] = 1
