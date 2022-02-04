@@ -152,7 +152,7 @@ class TeamFormationProblem:
         return max_edge_coverage, bestExpertTaskEdge
     
 
-    def thresholdPlotter(f_obj, threshold_arr):
+    def thresholdPlotter(threshold_arr, f_obj):
         '''
         Function to plot the objective and threshold
         ARGS:
@@ -160,7 +160,7 @@ class TeamFormationProblem:
             threshold_arr  : Threshold array
         
         RETURN:
-            Plots the array
+            None (plots the array)        
         '''
         plt.figure(figsize=(9,6))
         plt.plot(threshold_arr, f_obj, label='Objective, F')
@@ -628,7 +628,7 @@ class TeamFormationProblem:
             baselines   : List of baselines to run, must be a list consisting of one or more of: ['random', 'no_update_greedy']
         '''
 
-    def computeTaskAssigment(self, lazy_eval=True, baselines=['random', 'no_update_greedy'], plot_flag=False):
+    def computeTaskAssigment(self, lazy_eval=True, baselines=['random', 'no_update_greedy'], plot_flag=True):
         '''
         Compute a Task Assignment, of experts to tasks.
         Use m thresholds for the maximum load, and call a greedy method for each threshold
@@ -641,6 +641,10 @@ class TeamFormationProblem:
         startTime = time.perf_counter()
         F_max = 0 #store maximum objective value
         best_T_i = None
+
+        #Arrays to store objective and threshold values for plotting
+        F_arr = [] 
+        T_arr = []
 
         for T_i in range(1, self.maxWorkloadThreshold+1):
             logging.info('--------------------------------------------------------------------------------------------------')
@@ -661,6 +665,9 @@ class TeamFormationProblem:
             #Compute Objective: Coverage - T_i
             F_i = sum(self.currentCoverageList) - T_i
             logging.info("F_i = {:.3f}".format(F_i))
+
+            F_arr.append(F_i)
+            T_arr.append(T_i)
 
             if F_i < 0:
                 break
@@ -697,6 +704,10 @@ class TeamFormationProblem:
                     NUG_F_i = sum(self.currentCoverageList) - T_i
                     logging.info("Baseline No Update Greedy F_i = {:.3f}".format(NUG_F_i))
 
+
+        #Plot
+        if plot_flag:
+            self.thresholdPlotter(T_arr, F_arr)
 
         logging.info("Best Task Assignment is for max workload threshold: {}, F_i(max)={:.3f} \n{}".format(best_T_i, F_max, self.taskAssignment))
         
