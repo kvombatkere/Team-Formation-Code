@@ -6,6 +6,7 @@
 import numpy as np
 from heapq import heappop, heappush, heapify
 import time, random
+import matplotlib.pyplot as plt
 import logging
 logging.basicConfig(format='%(asctime)s |%(levelname)s: %(message)s', level=logging.INFO)
 
@@ -149,7 +150,28 @@ class TeamFormationProblem:
                             return max_edge_coverage, bestExpertTaskEdge
 
         return max_edge_coverage, bestExpertTaskEdge
+    
 
+    def thresholdPlotter(f_obj, threshold_arr):
+        '''
+        Function to plot the objective and threshold
+        ARGS:
+            f_obj   : Objective array
+            threshold_arr  : Threshold array
+        
+        RETURN:
+            Plots the array
+        '''
+        plt.figure(figsize=(9,6))
+        plt.plot(threshold_arr, f_obj, label='Objective, F')
+        title_text = 'Threshold, T_i vs. Objective, F'
+        plt.title(title_text, fontsize=11)
+        plt.xlabel('Threshold, T_i')
+        plt.ylabel('Objective, F')
+        plt.legend(loc='upper right')
+        plt.show()
+        
+        return None
 
 
     def greedyTaskAssignment(self, expert_copies_list):
@@ -596,9 +618,17 @@ class TeamFormationProblem:
 
         return taskAssignment_i
         
+    def compute_reverseThreshold(self):
+        '''
+        Compute a Task Assignment, of experts to tasks. 
+        Use m thresholds for the maximum load, and call a greedy method for each threshold
+        Store this task assignment in self.taskAssignment
+        ARGS:
+            lazy_eval  : Lazy Greedy evaluation, set True as default
+            baselines   : List of baselines to run, must be a list consisting of one or more of: ['random', 'no_update_greedy']
+        '''
 
-
-    def computeTaskAssigment(self, lazy_eval=True, baselines=['random', 'no_update_greedy']):
+    def computeTaskAssigment(self, lazy_eval=True, baselines=['random', 'no_update_greedy'], plot_flag=False):
         '''
         Compute a Task Assignment, of experts to tasks.
         Use m thresholds for the maximum load, and call a greedy method for each threshold
@@ -606,6 +636,7 @@ class TeamFormationProblem:
         ARGS:
             lazy_eval  : Lazy Greedy evaluation, set True as default
             baselines   : List of baselines to run, must be a list consisting of one or more of: ['random', 'no_update_greedy']
+            plot_flag   : Plot f vs. threshold, set False as default
         '''
         startTime = time.perf_counter()
         F_max = 0 #store maximum objective value
