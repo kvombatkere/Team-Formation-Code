@@ -152,19 +152,22 @@ class TeamFormationProblem:
         return max_edge_coverage, bestExpertTaskEdge
     
 
-    def thresholdPlotter(threshold_arr, f_obj):
+    def thresholdPlotter(self, threshold_arr, f_obj_arr, obj_labels):
         '''
         Function to plot the objective and threshold
         ARGS:
-            f_obj   : Objective array
+            f_obj_arr   : Nested list of objective arrays (correspond to F and baselines)
+            obj_labels    : string labels for plotting
             threshold_arr  : Threshold array
         
         RETURN:
             None (plots the array)        
         '''
         plt.figure(figsize=(9,6))
-        plt.plot(threshold_arr, f_obj, label='Objective, F')
-        title_text = 'Threshold, T_i vs. Objective, F'
+        for i, f_obj in enumerate(f_obj_arr):
+            plt.plot(threshold_arr, f_obj, label=obj_labels[i])
+        
+        title_text = 'Threshold, T_i vs. Objectives, F'
         plt.title(title_text, fontsize=11)
         plt.xlabel('Threshold, T_i')
         plt.ylabel('Objective, F')
@@ -643,7 +646,7 @@ class TeamFormationProblem:
         best_T_i = None
 
         #Arrays to store objective and threshold values for plotting
-        F_arr = [] 
+        F_arr, F_random_arr, F_noupdate_arr = [], [], []
         T_arr = []
 
         for T_i in range(1, self.maxWorkloadThreshold+1):
@@ -692,6 +695,8 @@ class TeamFormationProblem:
                     random_F_i = sum(self.currentCoverageList) - T_i
                     logging.info("Baseline Random F_i = {:.3f}".format(random_F_i))
 
+                    F_random_arr.append(random_F_i)
+
                 if b == 'no_update_greedy':
                     #Create T_i copies of each expert, using a single list to keep track of copies
                     experts_copy_list_T_i = [T_i for i in range(self.n)]
@@ -703,11 +708,22 @@ class TeamFormationProblem:
                     #Compute Objective: Coverage - T_i
                     NUG_F_i = sum(self.currentCoverageList) - T_i
                     logging.info("Baseline No Update Greedy F_i = {:.3f}".format(NUG_F_i))
+                    F_noupdate_arr.append(NUG_F_i)
 
-
-        #Plot
+        #Plotting logic
         if plot_flag:
-            self.thresholdPlotter(T_arr, F_arr)
+            f_objectives_arr = [F_arr]
+            f_objectives_labels = ['F']
+            for b in baselines:
+                if b == 'random':
+                    f_objectives_arr.append(F_random_arr)
+                    f_objectives_labels.append('Random')
+
+                if b == 'no_update_greedy':
+                    f_objectives_arr.append(F_noupdate_arr)
+                    f_objectives_labels.append('No-Update Greedy')
+
+            self.thresholdPlotter(T_arr, f_objectives_arr,f_objectives_labels)
 
         logging.info("Best Task Assignment is for max workload threshold: {}, F_i(max)={:.3f} \n{}".format(best_T_i, F_max, self.taskAssignment))
         
