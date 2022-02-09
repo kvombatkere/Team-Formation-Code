@@ -507,7 +507,7 @@ class TeamFormationProblem:
         '''
         coverageList = [0 for j in range(self.m)]
         expertUnionSkillsList = [set() for j in range(self.m)]
-        expert_copies_list = expertCopiesList
+        expert_copies_list = expertCopiesList.copy()
 
         #Initialize max heap
         self.maxHeap = []
@@ -557,7 +557,7 @@ class TeamFormationProblem:
         #Initialize task assignment and coverage list thus far
         threshold_flag = False
 
-        taskAssignment_i = initialAssignment
+        taskAssignment_i = initialAssignment.copy()
 
         #Compute coverage, expert skills, expert copies at start
         #Also initializes the max heap
@@ -579,10 +579,11 @@ class TeamFormationProblem:
             expertCopyMinVal = min(expert_copies)
             if expertCopyMinVal == 0 and threshold_flag is False:
                 threshold_flag = True
-                taskAssignment_t_iminus1 = taskAssignment_i
-                
+                taskAssignment_t_iminus1 = taskAssignment_i.copy()
+        
                 #Remove edge that was just added
                 taskAssignment_t_iminus1[best_ExpertTaskEdge['expert_index'], best_ExpertTaskEdge['task_index']] = 0
+
 
             self.updateCurrentCoverageList(best_ExpertTaskEdge, deltaCoverage)
             self.updateExpertUnionSkillsList(best_ExpertTaskEdge)
@@ -591,10 +592,9 @@ class TeamFormationProblem:
             #Get next best assignment and coverage value
             deltaCoverage, best_ExpertTaskEdge = self.getLazyExpertTaskEdge(taskAssignment_i, expert_copies)
 
-
-        if 0 < expertCopyMinVal:
-            taskAssignment_t_iminus1 = taskAssignment_i
-
+        #If all experts weren't used then t_(i-1) assignment can be the same for next assignment
+        if expertCopyMinVal > 0:
+            taskAssignment_t_iminus1 = taskAssignment_i.copy()
 
         runTime = time.perf_counter() - startTime
         logging.debug("Reverse Threshold Greedy Task Assignment computation time = {:.1f} seconds".format(runTime))
@@ -607,30 +607,26 @@ class TeamFormationProblem:
     def compute_reverseThreshold(self):
         '''
         Compute a Task Assignment, of experts to tasks - reuse computation by traversing thresholds in reverse order
-        Store this task assignment in self.taskAssignment
-        ARGS:
-            lazy_eval  : Lazy Greedy evaluation, set True as default
-            baselines   : List of baselines to run, must be a list consisting of one or more of: ['random', 'no_update_greedy']
         '''
-        #First run for largest threshold
-        T_i = self.maxWorkloadThreshold        
-        experts_copy_list_T_i = [T_i] * self.n
         
         #Create empty task assigment matrix
-        initial_taskAssignment_i = np.zeros((self.n, self.m), dtype=np.int8)
+        taskAssignment_T_iminusone = np.zeros((self.n, self.m), dtype=np.int8)
 
-        taskAssignment_T_i, lastAssignments, copies = self.reverseThresholdtaskAssignment(experts_copy_list_T_i, initial_taskAssignment_i)
-        logging.info("Computing Reverse Threshold Greedy Task Assignment (Lazy Eval) for max load, T_i={}".format(T_i))
-        logging.info("lastAssignments: {}, \n Task Assignment: \n{}".format(lastAssignments, taskAssignment_T_i))
 
-        print(min(copies))
-    
         #Run for subsequent T_(i-1) thresholds, reusing computation from T_i
-        # for T_i in range(self.maxWorkloadThreshold, 0, -1):
-        #     #Create T_i copies of each expert, using a single list to keep track of copies
-        #     experts_copy_list_T_i = [T_i for i in range(self.n)]
+        for T_i in range(self.maxWorkloadThreshold+1, 0, -1):
 
-        #     taskAssignment_T_i = self.lazyGreedyTaskAssignment(experts_copy_list_T_i)       
+            #Create T_i copies of each expert, using a single list to keep track of copies
+            experts_copy_list_T_i = [T_i] * self.n
+            print("Expert Copies list = {}".format(experts_copy_list_T_i))
+
+
+            initial_taskAssignment_i = taskAssignment_T_iminusone.copy()
+            taskAssignment_T_i, taskAssignment_T_iminusone = self.reverseThresholdtaskAssignment(experts_copy_list_T_i, initial_taskAssignment_i)     
+
+            logging.info("Computing Reverse Threshold Greedy Task Assignment (Lazy Eval) for max load, T_i={}".format(T_i))
+            logging.info("Task Assigment: \n{}, \n Initial Task Assignment T_(i-1): \n{}".format(taskAssignment_T_i, taskAssignment_T_iminusone))   
+            
         return None
 
 
