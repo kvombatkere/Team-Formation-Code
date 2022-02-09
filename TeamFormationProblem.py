@@ -474,6 +474,26 @@ class TeamFormationProblem:
         return taskAssignment_i
 
 
+    def removeLastAssigments(self, taskAssignment, lastAssignmentList):
+        '''
+        Funtion to remove the last expert-task assignments for each expert
+        ARGS:
+            taskAssignment : task assignment
+            lastAssignmentList  : list of last assigments for each expert
+        
+        RETURN:
+            editedAssignments : Edited task assignments with last assignment removed
+        '''
+        editedAssignments = taskAssignment
+
+        for i, task_list in enumerate(lastAssignmentList):
+            if task_list: #If there are tasks assigned to this expert
+                for j in task_list:
+                    editedAssignments[i,j] = 0
+
+        return editedAssignments
+
+
     def compute_CoverageList_ExpertSkills(self, taskAssignment_i, expertCopiesList):
         '''
         Compute the current coverage list and union of skills assigned to each task
@@ -529,43 +549,58 @@ class TeamFormationProblem:
             initialAssignment   : Initial assignment of experts to tasks
         
         RETURN:
-            taskAssignment  : greedy task assigment, with lazy evaluation
-            lastAssignment_list   : Last assignment of each expert
+            taskAssignment_i    : 
+            taskAssignment_t_iminus1
         '''
         startTime = time.perf_counter()
 
         #Initialize task assignment and coverage list thus far
-        threshold_val = expert_copies_list[0]
+        threshold_flag = False
+
         taskAssignment_i = initialAssignment
-        lastAssignment_list = [None]*self.n
 
         #Compute coverage, expert skills, expert copies at start
         #Also initializes the max heap
         self.currentCoverageList, self.currentExpertUnionSkills, expert_copies = self.compute_CoverageList_ExpertSkills(taskAssignment_i, expert_copies_list)
-
+        
+        deltaCoverage, best_ExpertTaskEdge = self.getLazyExpertTaskEdge(taskAssignment_i, expert_copies)
 
         #Assign edges until there is no more coverage possible or no expert copies left
         while (deltaCoverage > 0) and (sum(expert_copies) != 0):
-            #Get next best assignment and coverage value
-            deltaCoverage, best_ExpertTaskEdge = self.getLazyExpertTaskEdge(taskAssignment_i, expert_copies)
-
             #Add edge to assignment
             taskAssignment_i[best_ExpertTaskEdge['expert_index'], best_ExpertTaskEdge['task_index']] = 1
 
             ##Perform updates 
             #Decrement expert copy, Update current coverage list and expert union skills list
-            expert_copies_list[best_ExpertTaskEdge['expert_index']] -= 1
+            expert_copies[best_ExpertTaskEdge['expert_index']] -= 1
+
+            #check expert copies for minimum value to detect if threshold is fully used
+            #Store task assigment
+            expertCopyMinVal = min(expert_copies)
+            if expertCopyMinVal == 0 and threshold_flag is False:
+                threshold_flag = True
+                taskAssignment_t_iminus1 = taskAssignment_i
+                
+                #Remove edge that was just added
+                taskAssignment_t_iminus1[best_ExpertTaskEdge['expert_index'], best_ExpertTaskEdge['task_index']] = 0
+
             self.updateCurrentCoverageList(best_ExpertTaskEdge, deltaCoverage)
             self.updateExpertUnionSkillsList(best_ExpertTaskEdge)
             logging.debug("Current Coverage List = {}".format(self.currentCoverageList))
-            
 
+            #Get next best assignment and coverage value
+            deltaCoverage, best_ExpertTaskEdge = self.getLazyExpertTaskEdge(taskAssignment_i, expert_copies)
+
+
+        if 0 < expertCopyMinVal:
+            taskAssignment_t_iminus1 = taskAssignment_i
 
 
         runTime = time.perf_counter() - startTime
         logging.debug("Reverse Threshold Greedy Task Assignment computation time = {:.1f} seconds".format(runTime))
 
-        return taskAssignment_i
+
+        return taskAssignment_i, taskAssignment_t_iminus1
 
 
 
@@ -577,8 +612,6 @@ class TeamFormationProblem:
             lazy_eval  : Lazy Greedy evaluation, set True as default
             baselines   : List of baselines to run, must be a list consisting of one or more of: ['random', 'no_update_greedy']
         '''
-        expert_smallestThreshold = [0] * self.n
-
         #First run for largest threshold
         T_i = self.maxWorkloadThreshold        
         experts_copy_list_T_i = [T_i] * self.n
@@ -586,16 +619,19 @@ class TeamFormationProblem:
         #Create empty task assigment matrix
         initial_taskAssignment_i = np.zeros((self.n, self.m), dtype=np.int8)
 
-        taskAssignment_T_i = self.reverseThresholdtaskAssignment(experts_copy_list_T_i, initial_taskAssignment_i)
+        taskAssignment_T_i, lastAssignments, copies = self.reverseThresholdtaskAssignment(experts_copy_list_T_i, initial_taskAssignment_i)
+        logging.info("Computing Reverse Threshold Greedy Task Assignment (Lazy Eval) for max load, T_i={}".format(T_i))
+        logging.info("lastAssignments: {}, \n Task Assignment: \n{}".format(lastAssignments, taskAssignment_T_i))
 
-
+        print(min(copies))
+    
         #Run for subsequent T_(i-1) thresholds, reusing computation from T_i
         # for T_i in range(self.maxWorkloadThreshold, 0, -1):
         #     #Create T_i copies of each expert, using a single list to keep track of copies
         #     experts_copy_list_T_i = [T_i for i in range(self.n)]
 
         #     taskAssignment_T_i = self.lazyGreedyTaskAssignment(experts_copy_list_T_i)       
-
+        return None
 
 
 
