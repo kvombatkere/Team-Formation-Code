@@ -485,12 +485,13 @@ class TeamFormationProblem:
         '''
         editedAssignments = taskAssignment.copy()
 
-        logging.info("self.lastAssignmentList:{}".format(self.lastAssignmentList))
+        logging.debug("self.lastAssignmentList:{}".format(self.lastAssignmentList))
         for i, task_j in enumerate(self.lastAssignmentList):
             if task_j: #If there are tasks assigned to this expert
-                j = task_j[-1]
-                editedAssignments[i,j] = 0
-                self.lastAssignmentList[i].remove(task_j[-1])
+                if expert_copies[i] <= 0:
+                    j = task_j[-1]
+                    editedAssignments[i,j] = 0
+                    self.lastAssignmentList[i].remove(task_j[-1])
 
         return editedAssignments, expert_copies
         
@@ -575,9 +576,9 @@ class TeamFormationProblem:
 
         #if minVal is already 0, then remove the last assigments for experts with value 0
         expertCopyMinVal = min(expert_copies)
-        logging.info("Minval: {}, expert copies: {}".format(expertCopyMinVal, expert_copies))
+        logging.debug("Minval: {}, expert copies: {}".format(expertCopyMinVal, expert_copies))
 
-        if expertCopyMinVal == 0:
+        if expertCopyMinVal <= 0:
             taskAssignment_t_iminus1, expert_copies = self.removeLastAssigments(taskAssignment_i, expert_copies)
             threshold_flag = True
 
