@@ -492,6 +492,7 @@ class TeamFormationProblem:
                     j = task_j[-1]
                     editedAssignments[i,j] = 0
                     self.lastAssignmentList[i].remove(task_j[-1])
+                    expert_copies[i] = 0
 
         return editedAssignments, expert_copies
         
@@ -572,8 +573,6 @@ class TeamFormationProblem:
         #Also initializes the max heap
         self.currentCoverageList, self.currentExpertUnionSkills, expert_copies = self.compute_CoverageList_ExpertSkills(taskAssignment_i, expert_copies_list)
         
-        deltaCoverage, best_ExpertTaskEdge = self.getLazyExpertTaskEdge(taskAssignment_i, expert_copies)
-
         #if minVal is already 0, then remove the last assigments for experts with value 0
         expertCopyMinVal = min(expert_copies)
         logging.debug("Minval: {}, expert copies: {}".format(expertCopyMinVal, expert_copies))
@@ -581,6 +580,8 @@ class TeamFormationProblem:
         if expertCopyMinVal <= 0:
             taskAssignment_t_iminus1, expert_copies = self.removeLastAssigments(taskAssignment_i, expert_copies)
             threshold_flag = True
+
+        deltaCoverage, best_ExpertTaskEdge = self.getLazyExpertTaskEdge(taskAssignment_i, expert_copies)
 
         #Assign edges until there is no more coverage possible or no expert copies left
         while (deltaCoverage > 0) and (sum(expert_copies) > 0):
@@ -643,7 +644,7 @@ class TeamFormationProblem:
         #Keep track of last assignments of each expert
         self.lastAssignmentList = [[] for i in range(self.n)]
 
-
+        logging.info('--------------------------------Computing Reverse Threshold Greedy Task Assignment-----------------------------------------')
         #Run for subsequent T_(i-1) thresholds, reusing computation from T_i
         for T_i in range(self.maxWorkloadThreshold, 0, -1):
             #Create T_i copies of each expert, using a single list to keep track of copies
@@ -658,7 +659,7 @@ class TeamFormationProblem:
             #Compute Objective: Coverage - T_i
             F_i = sum(self.currentCoverageList) - T_i
             logging.debug("F_i = {:.3f}".format(F_i))
-            logging.info("Computed Reverse Threshold Greedy Task Assignment for T_i={}, F_i={:.3f}".format(T_i, F_i))
+            logging.info("Evaluated T_i={}, F_i={:.3f}".format(T_i, F_i))
 
 
             if F_i > F_max:
@@ -697,8 +698,8 @@ class TeamFormationProblem:
         F_arr, F_random_arr, F_noupdate_arr = [], [], []
         T_arr = []
 
+        logging.info('--------------------------------Computing Greedy Task Assignment (Lazy Eval)-----------------------------------------')
         for T_i in range(1, self.maxWorkloadThreshold+1):
-            logging.info('--------------------------------------------------------------------------------------------------')
             #Create T_i copies of each expert, using a single list to keep track of copies
             experts_copy_list_T_i = [T_i for i in range(self.n)]
 
@@ -716,7 +717,7 @@ class TeamFormationProblem:
             #Compute Objective: Coverage - T_i
             F_i = sum(self.currentCoverageList) - T_i
             logging.debug("F_i = {:.3f}".format(F_i))
-            logging.debug("Computed Greedy Task Assignment (Lazy Eval) for T_i={}, F_i={:.3f}".format(T_i, F_i))
+            logging.info("Computed Greedy Task Assignment (Lazy Eval) for T_i={}, F_i={:.3f}".format(T_i, F_i))
 
 
             F_arr.append(F_i)
@@ -795,16 +796,16 @@ class TeamFormationProblem:
         lazy_t_arr, lazy_f_arr, regular_runtime = self.computeTaskAssigment(baselines=[])
 
         #Plot
-        plt.figure(figsize=(9,6))
-        plt.plot(reverse_t_arr, reverse_f_arr, label='Reverse Threshold')
-        plt.plot(lazy_t_arr, lazy_f_arr, label='Regular Threshold')
+        # plt.figure(figsize=(9,6))
+        # plt.plot(reverse_t_arr, reverse_f_arr, label='Reverse Threshold')
+        # plt.plot(lazy_t_arr, lazy_f_arr, label='Regular Threshold')
         
-        title_text = 'Reverse vs. Regular Objectives'
-        plt.title(title_text, fontsize=11)
-        plt.xlabel('Threshold, T_i')
-        plt.ylabel('Objective, F')
-        plt.legend(loc='upper right')
-        plt.show()
+        # title_text = 'Reverse vs. Regular Threshold'
+        # plt.title(title_text, fontsize=11)
+        # plt.xlabel('Threshold, T_i')
+        # plt.ylabel('Objective, F')
+        # plt.legend(loc='upper right')
+        # plt.show()
 
         return reverse_runtime, regular_runtime
 
