@@ -631,6 +631,11 @@ class TeamFormationProblem:
         startTime = time.perf_counter()
         F_max = 0 #store maximum objective value
         best_T_i = None
+
+        #Store threshold and objective values
+        threshold_arr = []
+        objective_arr = []
+
         
         #Create empty task assigment matrix
         taskAssignment_T_iminusone = np.zeros((self.n, self.m), dtype=np.int8)
@@ -641,33 +646,36 @@ class TeamFormationProblem:
 
         #Run for subsequent T_(i-1) thresholds, reusing computation from T_i
         for T_i in range(self.maxWorkloadThreshold, 0, -1):
-            logging.info("Computing Reverse Threshold Greedy Task Assignment (Lazy Eval) for max load, T_i={}".format(T_i))
-
             #Create T_i copies of each expert, using a single list to keep track of copies
             experts_copy_list_T_i = [T_i] * self.n
 
             initial_taskAssignment_i = taskAssignment_T_iminusone.copy()
             taskAssignment_T_i, taskAssignment_T_iminusone = self.reverseThresholdtaskAssignment(experts_copy_list_T_i, initial_taskAssignment_i)     
 
-            logging.info("Task Assigment: \n{}".format(taskAssignment_T_i))
-            logging.info("Task Assigment t_(i-1): \n{}".format(taskAssignment_T_iminusone))
-
+            logging.debug("Task Assigment: \n{}".format(taskAssignment_T_i))
+            logging.debug("Task Assigment t_(i-1): \n{}".format(taskAssignment_T_iminusone))
 
             #Compute Objective: Coverage - T_i
             F_i = sum(self.currentCoverageList) - T_i
-            logging.info("F_i = {:.3f}".format(F_i))
+            logging.debug("F_i = {:.3f}".format(F_i))
+            logging.info("Computed Reverse Threshold Greedy Task Assignment for T_i={}, F_i={:.3f}".format(T_i, F_i))
+
 
             if F_i > F_max:
                 F_max = F_i
                 self.taskAssignment = taskAssignment_T_i
                 best_T_i = T_i
 
+            threshold_arr.append(T_i)
+            objective_arr.append(F_i)
+            
+
         logging.info("Best Task Assignment is for max workload threshold: {}, F_i(max)={:.3f} \n{}".format(best_T_i, F_max, self.taskAssignment))
         
         runTime = time.perf_counter() - startTime
         logging.info("\nTotal Computation time Reverse Threshold= {:.3f} seconds".format(runTime))
             
-        return None
+        return threshold_arr, objective_arr, runTime
 
 
 
@@ -696,18 +704,20 @@ class TeamFormationProblem:
 
             #Greedily assign experts to tasks using this expert list
             if lazy_eval:
-                logging.info("Computing Greedy Task Assignment (Lazy Eval) for max load, T_i={}".format(T_i))
+                logging.debug("Computing Greedy Task Assignment (Lazy Eval) for max load, T_i={}".format(T_i))
                 taskAssignment_T_i = self.lazyGreedyTaskAssignment(experts_copy_list_T_i)       
-                logging.info("Greedy Task Assignment (Lazy Eval): \n{}".format(taskAssignment_T_i))
+                logging.debug("Greedy Task Assignment (Lazy Eval): \n{}".format(taskAssignment_T_i))
 
             else:
-                logging.info("Computing Greedy Task Assignment, for max load, T_i={}".format(T_i))
+                logging.debug("Computing Greedy Task Assignment, for max load, T_i={}".format(T_i))
                 taskAssignment_T_i = self.greedyTaskAssignment(experts_copy_list_T_i) 
-                logging.info("Greedy Task Assignment (regular): \n{}".format(taskAssignment_T_i))
+                logging.debug("Greedy Task Assignment (regular): \n{}".format(taskAssignment_T_i))
             
             #Compute Objective: Coverage - T_i
             F_i = sum(self.currentCoverageList) - T_i
-            logging.info("F_i = {:.3f}".format(F_i))
+            logging.debug("F_i = {:.3f}".format(F_i))
+            logging.debug("Computed Greedy Task Assignment (Lazy Eval) for T_i={}, F_i={:.3f}".format(T_i, F_i))
+
 
             F_arr.append(F_i)
             T_arr.append(T_i)
@@ -770,5 +780,31 @@ class TeamFormationProblem:
         runTime = time.perf_counter() - startTime
         logging.info("\nTotal Computation time = {:.3f} seconds".format(runTime))
 
-        return None
+        return T_arr, F_arr, runTime
+
+
+
+    def compare_Methods(self):
+        '''
+        Compare lazy greedy and reverse threshold methods
+        '''
+        #Call reverse threshold method
+        reverse_t_arr, reverse_f_arr, reverse_runtime = self.compute_reverseThreshold()
+
+        #Call regular threshold method
+        lazy_t_arr, lazy_f_arr, regular_runtime = self.computeTaskAssigment(baselines=[])
+
+        #Plot
+        plt.figure(figsize=(9,6))
+        plt.plot(reverse_t_arr, reverse_f_arr, label='Reverse Threshold')
+        plt.plot(lazy_t_arr, lazy_f_arr, label='Regular Threshold')
+        
+        title_text = 'Reverse vs. Regular Objectives'
+        plt.title(title_text, fontsize=11)
+        plt.xlabel('Threshold, T_i')
+        plt.ylabel('Objective, F')
+        plt.legend(loc='upper right')
+        plt.show()
+
+        return reverse_runtime, regular_runtime
 
