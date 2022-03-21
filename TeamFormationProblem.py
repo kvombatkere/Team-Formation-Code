@@ -472,23 +472,33 @@ class TeamFormationProblem:
         return taskAssignment_i
 
 
-    def computeTaskAssigment(self, lazy_eval=True, baselines=['random', 'no_update_greedy'], plot_flag=False):
+    def computeTaskAssigment(self, baselines=['random', 'no_update_greedy'], plot_flag=False):
         '''
         Compute a Task Assignment, of experts to tasks.
         Use m thresholds for the maximum load, and call a greedy method for each threshold
         Store this task assignment in self.taskAssignment
         ARGS:
-            lazy_eval  : Lazy Greedy evaluation, set True as default
             baselines   : List of baselines to run, must be a list consisting of one or more of: ['random', 'no_update_greedy']
             plot_flag   : Plot f vs. threshold, set False as default
         '''
         startTime = time.perf_counter()
         F_max = 0 #store maximum objective value
         best_T_i = None
+        F_i_prev = 0 #variable to store previous objective
 
         #Arrays to store objective and threshold values for plotting
         F_arr, F_random_arr, F_noupdate_arr = [], [], []
         T_arr = []
+
+        #Pre-compute lambda
+        lambda_val = 0
+        experts_copy_list_T_i = [self.m for i in range(self.n)]
+        taskAssignment_T_i = self.lazyGreedyTaskAssignment(experts_copy_list_T_i)
+        
+        F_max_val = sum(self.currentCoverageList)
+        lambda_val = self.maxWorkloadThreshold/F_max_val
+        logging.info("Pre-Computed Lambda value = {}".format(lambda_val))
+
 
         logging.info('--------------------------------Computing Greedy Task Assignment (Lazy Eval)-----------------------------------------')
         for T_i in range(1, self.maxWorkloadThreshold+1):
@@ -496,33 +506,23 @@ class TeamFormationProblem:
             experts_copy_list_T_i = [T_i for i in range(self.n)]
 
             #Greedily assign experts to tasks using this expert list
-            if lazy_eval:
-                logging.debug("Computing Greedy Task Assignment (Lazy Eval) for max load, T_i={}".format(T_i))
-                taskAssignment_T_i = self.lazyGreedyTaskAssignment(experts_copy_list_T_i)       
-                logging.debug("Greedy Task Assignment (Lazy Eval): \n{}".format(taskAssignment_T_i))
+            logging.debug("Computing Greedy Task Assignment (Lazy Eval) for max load, T_i={}".format(T_i))
+            taskAssignment_T_i = self.lazyGreedyTaskAssignment(experts_copy_list_T_i)       
+            logging.debug("Greedy Task Assignment (Lazy Eval): \n{}".format(taskAssignment_T_i))
 
-            else:
-                logging.debug("Computing Greedy Task Assignment, for max load, T_i={}".format(T_i))
-                taskAssignment_T_i = self.greedyTaskAssignment(experts_copy_list_T_i) 
-                logging.debug("Greedy Task Assignment (regular): \n{}".format(taskAssignment_T_i))
             
-            #Compute Objective: Coverage - T_i
-            F_i = sum(self.currentCoverageList) - T_i
+            #Compute Objective: (lambda)*Coverage - T_i
+            F_i = (lambda_val * sum(self.currentCoverageList)) - T_i
             logging.debug("F_i = {:.3f}".format(F_i))
             logging.info("Computed Greedy Task Assignment (Lazy Eval) for T_i={}, F_i={:.3f}".format(T_i, F_i))
 
-
             F_arr.append(F_i)
             T_arr.append(T_i)
-
-            if F_i < 0:
-                break
 
             if F_i > F_max:
                 F_max = F_i
                 self.taskAssignment = taskAssignment_T_i
                 best_T_i = T_i
-
 
             #Run baselines:
             for b in baselines:
@@ -535,7 +535,7 @@ class TeamFormationProblem:
                     logging.info("Baseline Random Task Assignment: \n{}".format(random_taskAssignment_T_i))
 
                     #Compute Objective: Coverage - T_i
-                    random_F_i = sum(self.currentCoverageList) - T_i
+                    random_F_i = (lambda_val * sum(self.currentCoverageList)) - T_i
                     logging.info("Baseline Random F_i = {:.3f}".format(random_F_i))
 
                     F_random_arr.append(random_F_i)
@@ -549,9 +549,14 @@ class TeamFormationProblem:
                     logging.info("Baseline No Update Greedy Task Assignment: \n{}".format(NUG_taskAssignment_T_i))
 
                     #Compute Objective: Coverage - T_i
-                    NUG_F_i = sum(self.currentCoverageList) - T_i
+                    NUG_F_i = (lambda_val * sum(self.currentCoverageList)) - T_i
                     logging.info("Baseline No Update Greedy F_i = {:.3f}".format(NUG_F_i))
                     F_noupdate_arr.append(NUG_F_i)
+
+            if F_i < F_i_prev:
+                break
+            F_i_prev = F_i
+
 
         #Plotting logic
         if plot_flag:
