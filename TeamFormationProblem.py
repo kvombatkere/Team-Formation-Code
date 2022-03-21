@@ -492,11 +492,12 @@ class TeamFormationProblem:
 
         #Pre-compute lambda
         lambda_val = 0
-        experts_copy_list_T_i = [self.m for i in range(self.n)]
-        taskAssignment_T_i = self.lazyGreedyTaskAssignment(experts_copy_list_T_i)
+        experts_copy_list_lambda = [self.m for i in range(self.n)]
+        taskAssignment_T_i = self.lazyGreedyTaskAssignment(experts_copy_list_lambda)
         
+        max_load_val = self.m - min(experts_copy_list_lambda)
         F_max_val = sum(self.currentCoverageList)
-        lambda_val = self.maxWorkloadThreshold/F_max_val
+        lambda_val = max_load_val/F_max_val
         logging.info("Pre-Computed Lambda value = {}".format(lambda_val))
 
 
