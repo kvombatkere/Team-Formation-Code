@@ -342,6 +342,119 @@ class TeamFormationProblem:
 
         return taskAssignment_i
 
+    # def initializeMaxHeap_task(self, task_j):
+    #     '''
+    #     Initialize the max heap for the task greedy baseline
+    #     Creates and updates self.maxHeap_task_j
+    #     ARGS:
+    #         task_j : index of task to create max heap for
+    #     '''
+    #     self.maxHeap_task_j = []
+    #     heapify(self.maxHeap_task_j)
+
+    #     T_j = self.tasks[task_j]
+
+    #     for i, E_i in enumerate(self.experts):
+    #         expert_skills = set(E_i)    #Get expert E_i skills as set
+    #         task_skills = set(T_j)    #Get task T_j skills as set
+            
+    #         #Compute initial coverage of E_i-T_J edge
+    #         edge_coverage = len(expert_skills.intersection(task_skills))/len(task_skills)
+    #         heapItem = (edge_coverage*-1, i, task_j)
+
+    #         heappush(self.maxHeap_task_j, heapItem)
+    
+    #     logging.info("Max Heap Task j: {}".format(self.maxHeap_task_j))
+
+    #     return    
+
+
+    def getBestExpertForTaskGreedy(self, taskAssignment, j):
+        '''
+        Greedily compute the best expert-task edge (assigment) that maximizes coverage in that iteration
+        ARGS:
+            taskAssignment : current task assigment
+            j : task index
+        
+        RETURN:
+            max_edge_coverage  : maximum value of change in task coverage by adding edge (i,j)
+            bestExpertTaskEdge  : indices of expert and task as a dictionary
+        '''
+        bestExpertTaskEdge = {'expert_index':None, 'task_index':None}
+        max_edge_coverage = 0
+
+        T_j = self.tasks[j]
+        
+        for i, E_i in enumerate(self.experts):
+            #Check if this expert is not yet assigned to T_j (A[i,j] = 0)
+            if (taskAssignment[i,j] == 0):
+                #Retrieve union of skills of all experts assigned to T_j and add expert E_i
+                expert_skills = self.currentExpertUnionSkills[j].union(set(E_i))
+                task_skills = set(T_j)    #Get task skills as a set
+                
+                #Compute task coverage with expert added
+                T_j_coverage = len(expert_skills.intersection(task_skills))/len(task_skills)
+                delta_coverage = T_j_coverage - self.currentCoverageList[j]
+                #logging.debug("deltaCoverage={:.1f}, T_j_coverage={}".format(delta_coverage, T_j_coverage))
+
+                if delta_coverage > max_edge_coverage:
+                    max_edge_coverage = delta_coverage
+                    bestExpertTaskEdge['expert_index'] = i
+                    bestExpertTaskEdge['task_index'] = j
+                    
+                    #Return immediately if all skills in a task are covered
+                    if max_edge_coverage == 1:
+                        return max_edge_coverage, bestExpertTaskEdge
+
+        return max_edge_coverage, bestExpertTaskEdge
+
+
+    def baseline_TaskGreedy(self, expert_copies_list):
+        '''
+        Baseline algorithm to compute task assignment. Greedily computes best assignment for each task
+        ARGS:
+            expert_copies_list : list of number of copies available of experts
+        
+        RETURN:
+            taskAssignment  : task assigment
+        '''
+        startTime = time.perf_counter()
+
+        #Create empty task assigment matrix
+        taskAssignment_i = np.zeros((self.n, self.m), dtype=np.int8)
+
+        #Initialize current coverage list
+        self.currentCoverageList = [0 for i in range(self.m)]
+        #Initialize expert union skills list as an empty list of sets
+        self.currentExpertUnionSkills = [set() for j in range(self.m)]
+        
+        for j, T_j in enumerate(self.tasks):
+            #Get first best expert-task assignment and delta coverage value
+            deltaCoverage, best_ExpertTaskEdge = self.getBestExpertForTaskGreedy(taskAssignment_i, j)
+
+            #Assign edges until there is no more coverage possible or no experts left
+            while (deltaCoverage > 0) and (sum(expert_copies_list) != 0):
+
+                #Add edge to assignment
+                taskAssignment_i[best_ExpertTaskEdge['expert_index'], best_ExpertTaskEdge['task_index']] = 1
+
+                ##Perform updates 
+                #Decrement expert copy, Update current coverage list and expert union skills list
+                expert_copies_list[best_ExpertTaskEdge['expert_index']] -= 1
+                self.updateCurrentCoverageList(best_ExpertTaskEdge, deltaCoverage)
+                self.updateExpertUnionSkillsList(best_ExpertTaskEdge)
+                logging.debug("Current Coverage List = {}".format(self.currentCoverageList))
+
+                #Get next best assignment and coverage value
+                deltaCoverage, best_ExpertTaskEdge = self.getBestExpertForTaskGreedy(taskAssignment_i, j)
+
+                logging.debug("deltaCoverage={:.1f}, best_ExpertTaskEdge={}".format(deltaCoverage, best_ExpertTaskEdge))
+
+        runTime = time.perf_counter() - startTime
+        logging.debug("Greedy Task Assignment computation time = {:.1f} seconds".format(runTime))
+
+
+
 
     def initializeMaxHeap(self):
         '''
