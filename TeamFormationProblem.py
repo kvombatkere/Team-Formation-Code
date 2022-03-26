@@ -86,6 +86,29 @@ class TeamFormationProblem:
             print("Experts Assigned to Task {}: {}".format(j, T_j_assigned_experts_indices))
 
 
+    def maximumExpertLoad(self, taskAssignment):
+        '''
+        Given a taskAssignment, compute the maximum expert load
+        ARGS:
+            taskAssignment  : current task assigment
+        RETURN: 
+            max_load    : Maximum expert workload
+        '''
+        max_load = 0
+
+        for i in range(self.n):
+            expert_i_tasks = taskAssignment[i,:]
+            expert_i_load = np.sum(expert_i_tasks)
+            
+            if expert_i_load > max_load:
+                max_load = expert_i_load
+                
+                if max_load == self.m:
+                    return max_load
+
+        return max_load
+
+
 
     def updateCurrentCoverageList(self, bestExpertTaskEdge, delta_coverage):
         '''
@@ -409,19 +432,16 @@ class TeamFormationProblem:
         return max_edge_coverage, bestExpertTaskEdge
 
 
-    def baseline_TaskGreedy(self, expert_copies_list):
+    def baseline_TaskGreedy(self):
         '''
         Baseline algorithm to compute task assignment. Greedily computes best assignment for each task
-        ARGS:
-            expert_copies_list : list of number of copies available of experts
-        
         RETURN:
             taskAssignment  : task assigment
         '''
         startTime = time.perf_counter()
 
         #Create empty task assigment matrix
-        taskAssignment_i = np.zeros((self.n, self.m), dtype=np.int8)
+        taskAssignment = np.zeros((self.n, self.m), dtype=np.int8)
 
         #Initialize current coverage list
         self.currentCoverageList = [0 for i in range(self.m)]
@@ -429,14 +449,17 @@ class TeamFormationProblem:
         self.currentExpertUnionSkills = [set() for j in range(self.m)]
         
         for j, T_j in enumerate(self.tasks):
+            #Create 1 copy of each expert, using a single list to keep track of copies
+            expert_copies_list = [1 for i in range(self.n)]
+
             #Get first best expert-task assignment and delta coverage value
-            deltaCoverage, best_ExpertTaskEdge = self.getBestExpertForTaskGreedy(taskAssignment_i, j)
+            deltaCoverage, best_ExpertTaskEdge = self.getBestExpertForTaskGreedy(taskAssignment, j)
 
             #Assign edges until there is no more coverage possible or no experts left
             while (deltaCoverage > 0) and (sum(expert_copies_list) != 0):
 
                 #Add edge to assignment
-                taskAssignment_i[best_ExpertTaskEdge['expert_index'], best_ExpertTaskEdge['task_index']] = 1
+                taskAssignment[best_ExpertTaskEdge['expert_index'], best_ExpertTaskEdge['task_index']] = 1
 
                 ##Perform updates 
                 #Decrement expert copy, Update current coverage list and expert union skills list
@@ -446,14 +469,14 @@ class TeamFormationProblem:
                 logging.debug("Current Coverage List = {}".format(self.currentCoverageList))
 
                 #Get next best assignment and coverage value
-                deltaCoverage, best_ExpertTaskEdge = self.getBestExpertForTaskGreedy(taskAssignment_i, j)
+                deltaCoverage, best_ExpertTaskEdge = self.getBestExpertForTaskGreedy(taskAssignment, j)
 
                 logging.debug("deltaCoverage={:.1f}, best_ExpertTaskEdge={}".format(deltaCoverage, best_ExpertTaskEdge))
 
         runTime = time.perf_counter() - startTime
         logging.debug("Greedy Task Assignment computation time = {:.1f} seconds".format(runTime))
 
-
+        return taskAssignment
 
 
     def initializeMaxHeap(self):
@@ -585,13 +608,13 @@ class TeamFormationProblem:
         return taskAssignment_i
 
 
-    def computeTaskAssigment(self, baselines=['random', 'no_update_greedy'], plot_flag=False):
+    def computeTaskAssigment(self, baselines=['random', 'no_update_greedy', 'task_greedy'], plot_flag=False):
         '''
         Compute a Task Assignment, of experts to tasks.
         Use m thresholds for the maximum load, and call a greedy method for each threshold
         Store this task assignment in self.taskAssignment
         ARGS:
-            baselines   : List of baselines to run, must be a list consisting of one or more of: ['random', 'no_update_greedy']
+            baselines   : List of baselines to run, must be a list consisting of one or more of: ['random', 'no_update_greedy', 'task_greedy]
             plot_flag   : Plot f vs. threshold, set False as default
         '''
         startTime = time.perf_counter()
@@ -672,6 +695,19 @@ class TeamFormationProblem:
             F_i_prev = F_i
 
 
+        #Check for task greedy
+        if 'task_greedy' in baselines:
+            logging.info("Baseline Task Greedy Task Assignment")
+            taskGreedy_taskAssignment = self.baseline_TaskGreedy()       
+            logging.info("Baseline Task Greedy Task Assignment: \n{}".format(taskGreedy_taskAssignment))
+
+            max_load = self.maximumExpertLoad(taskGreedy_taskAssignment)
+
+            #Compute Objective: (lambda)*Coverage - max_load
+            task_Greedy_F_i = (lambda_val * sum(self.currentCoverageList)) - max_load
+            logging.info("Baseline Task Greedy F_i = {:.3f}".format(task_Greedy_F_i))
+
+
         #Plotting logic
         if plot_flag:
             f_objectives_arr = [F_arr]
@@ -685,7 +721,7 @@ class TeamFormationProblem:
                     f_objectives_arr.append(F_noupdate_arr)
                     f_objectives_labels.append('No-Update Greedy')
 
-            self.thresholdPlotter(T_arr, f_objectives_arr,f_objectives_labels)
+            self.thresholdPlotter(T_arr, f_objectives_arr, f_objectives_labels)
 
         logging.info("Best Task Assignment is for max workload threshold: {}, F_i(max)={:.3f} \n{}".format(best_T_i, F_max, self.taskAssignment))
         
