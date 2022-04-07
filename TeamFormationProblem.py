@@ -32,7 +32,7 @@ class TeamFormationProblem:
     self.maxWorkloadThreshold   : thresholds for max expert workload to check upto
     '''
 
-    def __init__(self, m_tasks, n_experts, max_workload_threshold=2):
+    def __init__(self, m_tasks, n_experts, max_workload_threshold=100):
         '''
         Initialize problem instance with m tasks, n experts
         ARGS:
@@ -666,28 +666,24 @@ class TeamFormationProblem:
                 if b == 'random':
                     #Create T_i copies of each expert, using a single list to keep track of copies
                     experts_copy_list_T_i = [T_i for i in range(self.n)]
-
-                    logging.info("Baseline Random Task Assignment for max load, T_i={}".format(T_i))
                     random_taskAssignment_T_i = self.baseline_Random(experts_copy_list_T_i)       
-                    logging.info("Baseline Random Task Assignment: \n{}".format(random_taskAssignment_T_i))
+                    logging.debug("Baseline Random Task Assignment: \n{}".format(random_taskAssignment_T_i))
 
                     #Compute Objective: Coverage - T_i
                     random_F_i = (lambda_val * sum(self.currentCoverageList)) - T_i
-                    logging.info("Baseline Random F_i = {:.3f}".format(random_F_i))
+                    logging.info("Computed Baseline Random Task Assignment for T_i={}, F_i = {:.3f}".format(T_i, random_F_i))
 
                     F_random_arr.append(random_F_i)
 
                 if b == 'no_update_greedy':
                     #Create T_i copies of each expert, using a single list to keep track of copies
                     experts_copy_list_T_i = [T_i for i in range(self.n)]
-
-                    logging.info("Baseline No Update Greedy Task Assignment for max load, T_i={}".format(T_i))
                     NUG_taskAssignment_T_i = self.baseline_NoUpdateGreedy(experts_copy_list_T_i)       
-                    logging.info("Baseline No Update Greedy Task Assignment: \n{}".format(NUG_taskAssignment_T_i))
+                    logging.debug("Baseline No Update Greedy Task Assignment: \n{}".format(NUG_taskAssignment_T_i))
 
                     #Compute Objective: Coverage - T_i
                     NUG_F_i = (lambda_val * sum(self.currentCoverageList)) - T_i
-                    logging.info("Baseline No Update Greedy F_i = {:.3f}".format(NUG_F_i))
+                    logging.info("Computed Baseline No-Update Greedy Task Assignment for T_i={}, F_i = {:.3f}".format(T_i, NUG_F_i))
                     F_noupdate_arr.append(NUG_F_i)
 
             if F_i < F_i_prev:
@@ -699,7 +695,7 @@ class TeamFormationProblem:
         if 'task_greedy' in baselines:
             logging.info("Baseline Task Greedy Task Assignment")
             taskGreedy_taskAssignment = self.baseline_TaskGreedy()       
-            logging.info("Baseline Task Greedy Task Assignment: \n{}".format(taskGreedy_taskAssignment))
+            logging.debug("Baseline Task Greedy Task Assignment: \n{}".format(taskGreedy_taskAssignment))
 
             max_load = self.maximumExpertLoad(taskGreedy_taskAssignment)
 
@@ -723,7 +719,7 @@ class TeamFormationProblem:
 
             self.thresholdPlotter(T_arr, f_objectives_arr, f_objectives_labels)
 
-        logging.info("Best Task Assignment is for max workload threshold: {}, F_i(max)={:.3f} \n{}".format(best_T_i, F_max, self.taskAssignment))
+        logging.debug("Best Task Assignment is for max workload threshold: {}, F_i(max)={:.3f} \n{}".format(best_T_i, F_max, self.taskAssignment))
         
         runTime = time.perf_counter() - startTime
         logging.info("\nTotal Computation time = {:.3f} seconds".format(runTime))
