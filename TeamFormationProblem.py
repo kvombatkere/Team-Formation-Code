@@ -622,6 +622,8 @@ class TeamFormationProblem:
         best_T_i = None
         F_i_prev = 0 #variable to store previous objective
 
+        noUpdateGreedyRuntime = 0 #Track Runtime for No update greedy baseline
+
         #Arrays to store objective and threshold values for plotting
         F_arr, F_random_arr, F_noupdate_arr = [], [], []
         T_arr = []
@@ -676,6 +678,7 @@ class TeamFormationProblem:
                     F_random_arr.append(random_F_i)
 
                 if b == 'no_update_greedy':
+                    NUGi_startTime = time.perf_counter()
                     #Create T_i copies of each expert, using a single list to keep track of copies
                     experts_copy_list_T_i = [T_i for i in range(self.n)]
                     NUG_taskAssignment_T_i = self.baseline_NoUpdateGreedy(experts_copy_list_T_i)       
@@ -685,6 +688,8 @@ class TeamFormationProblem:
                     NUG_F_i = (lambda_val * sum(self.currentCoverageList)) - T_i
                     logging.info("Computed Baseline No-Update Greedy Task Assignment for T_i={}, F_i = {:.3f}".format(T_i, NUG_F_i))
                     F_noupdate_arr.append(NUG_F_i)
+                    NUG_i_runTime = time.perf_counter() - NUGi_startTime
+                    noUpdateGreedyRuntime += NUG_i_runTime
 
             # stop search if max is found
             if F_i < F_i_prev:
@@ -723,7 +728,6 @@ class TeamFormationProblem:
         logging.info("Best Task Assignment is for max workload threshold: {}, F_i(max)={:.3f} \n".format(best_T_i, F_max))
         
         runTime = time.perf_counter() - startTime
-        logging.info("\nTotal Computation time = {:.3f} seconds".format(runTime))
+        logging.info("\nTotal Computation time = {:.3f}s; No-Update-Greedy Runtime = {:.3f}s".format(runTime, noUpdateGreedyRuntime))
 
         return T_arr, F_arr, runTime
-        
