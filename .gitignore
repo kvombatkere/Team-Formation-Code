@@ -4,5 +4,4 @@
 *.gz
 *.swp
 *.pyc
-*.csv
 output/*
