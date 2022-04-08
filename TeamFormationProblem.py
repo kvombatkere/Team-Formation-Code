@@ -686,6 +686,7 @@ class TeamFormationProblem:
                     logging.info("Computed Baseline No-Update Greedy Task Assignment for T_i={}, F_i = {:.3f}".format(T_i, NUG_F_i))
                     F_noupdate_arr.append(NUG_F_i)
 
+            # stop search if max is found
             if F_i < F_i_prev:
                 break
             F_i_prev = F_i
@@ -707,7 +708,7 @@ class TeamFormationProblem:
         #Plotting logic
         if plot_flag:
             f_objectives_arr = [F_arr]
-            f_objectives_labels = ['F']
+            f_objectives_labels = ['Lazy Greedy']
             for b in baselines:
                 if b == 'random':
                     f_objectives_arr.append(F_random_arr)
@@ -719,9 +720,10 @@ class TeamFormationProblem:
 
             self.thresholdPlotter(T_arr, f_objectives_arr, f_objectives_labels)
 
-        logging.debug("Best Task Assignment is for max workload threshold: {}, F_i(max)={:.3f} \n{}".format(best_T_i, F_max, self.taskAssignment))
+        logging.info("Best Task Assignment is for max workload threshold: {}, F_i(max)={:.3f} \n".format(best_T_i, F_max))
         
         runTime = time.perf_counter() - startTime
         logging.info("\nTotal Computation time = {:.3f} seconds".format(runTime))
 
         return T_arr, F_arr, runTime
+        
