@@ -1,0 +1,10 @@
+IMDB dataset Team-Formation Algorithms: 04-10-23:23:01
+
+IMDB movieYear = 2015, Experts = 100, Tasks = 100
+Algorithm Runtimes: Total = 0.338s; Lazy Greedy = 0.129s; No-Update-Greedy = 0.081s; Task Greedy = 0.052s; Random = 0.036s;            
+
+IMDB movieYear = 2018, Experts = 100, Tasks = 100
+Algorithm Runtimes: Total = 0.349s; Lazy Greedy = 0.129s; No-Update-Greedy = 0.106s; Task Greedy = 0.048s; Random = 0.034s;            
+
+IMDB movieYear = 2020, Experts = 100, Tasks = 100
+Algorithm Runtimes: Total = 0.314s; Lazy Greedy = 0.116s; No-Update-Greedy = 0.086s; Task Greedy = 0.048s; Random = 0.033s;            
