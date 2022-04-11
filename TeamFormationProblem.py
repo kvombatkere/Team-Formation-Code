@@ -408,7 +408,7 @@ class TeamFormationProblem:
 
         T_j = self.tasks[j]
         
-        for i, E_i in enumerate(self.experts):
+        for i, E_i in enumerate(np.random.permutation(self.experts)):
             #Check if this expert is not yet assigned to T_j (A[i,j] = 0)
             if (taskAssignment[i,j] == 0):
                 #Retrieve union of skills of all experts assigned to T_j and add expert E_i
@@ -455,9 +455,8 @@ class TeamFormationProblem:
             #Get first best expert-task assignment and delta coverage value
             deltaCoverage, best_ExpertTaskEdge = self.getBestExpertForTaskGreedy(taskAssignment, j)
 
-            #Assign edges until there is no more coverage possible or no experts left
-            while (deltaCoverage > 0) and (sum(expert_copies_list) != 0):
-
+            #Assign edges until there is no more coverage possible or no experts left or task is already covered
+            while (0 < deltaCoverage) and (sum(expert_copies_list) != 0) and (self.currentCoverageList[j] != 1):
                 #Add edge to assignment
                 taskAssignment[best_ExpertTaskEdge['expert_index'], best_ExpertTaskEdge['task_index']] = 1
 
@@ -625,9 +624,9 @@ class TeamFormationProblem:
         #Track Runtime for Lazy Greedy, Random and No-Update-Greedy baseline
         runtimeDict = {'lazyGreedy': 0, 'noUpdateGreedy': 0, 'taskGreedy': 0, 'random': 0, 'total': 0}
 
-        #Arrays to store objective and threshold values for plotting
-        F_arr, F_random_arr, F_noupdate_arr = [], [], []
-        T_arr = []
+        #Track Objective and Max Load values
+        F_vals = {'lazyGreedy': None, 'noUpdateGreedy': None, 'taskGreedy': None, 'random': None}
+        workLoad_vals = {'lazyGreedy': None, 'noUpdateGreedy': None, 'taskGreedy': None, 'random': None}
 
         #Pre-compute lambda
         lambda_val = 0
@@ -641,8 +640,8 @@ class TeamFormationProblem:
 
 
         logging.info('--------------------------Computing Greedy Task Assignment (Lazy Eval)------------------------------------')
+        lazyGreedyi_start = time.perf_counter()
         for T_i in range(1, self.maxWorkloadThreshold+1):
-            lazyGreedyi_start = time.perf_counter()
             #Create T_i copies of each expert, using a single list to keep track of copies
             experts_copy_list_T_i = [T_i for i in range(self.n)]
 
@@ -656,82 +655,128 @@ class TeamFormationProblem:
             logging.debug("F_i = {:.3f}".format(F_i))
             logging.info("Computed Greedy Task Assignment (Lazy Eval) for T_i={}, F_i={:.3f}".format(T_i, F_i))
 
-            F_arr.append(F_i)
-            T_arr.append(T_i)
-
             if F_i > F_max:
                 F_max = F_i
                 self.taskAssignment = taskAssignment_T_i
                 best_T_i = T_i
 
-            runtimeDict['lazyGreedy'] += time.perf_counter() - lazyGreedyi_start
-
-            ## Run baselines:
-            if 'random' in baselines:
-                randi_startTime = time.perf_counter()
-                #Create T_i copies of each expert, using a single list to keep track of copies
-                experts_copy_list_T_i = [T_i for i in range(self.n)]
-                random_taskAssignment_T_i = self.baseline_Random(experts_copy_list_T_i)       
-                logging.debug("Baseline Random Task Assignment: \n{}".format(random_taskAssignment_T_i))
-
-                #Compute Objective: Coverage - T_i
-                random_F_i = (lambda_val * sum(self.currentCoverageList)) - T_i
-                logging.info("Computed Baseline Random Task Assignment for T_i={}, F_i = {:.3f}".format(T_i, random_F_i))
-                F_random_arr.append(random_F_i)
-                runtimeDict['random'] += time.perf_counter() - randi_startTime
-
-            if 'no_update_greedy' in baselines:
-                NUGi_startTime = time.perf_counter()
-                #Create T_i copies of each expert, using a single list to keep track of copies
-                experts_copy_list_T_i = [T_i for i in range(self.n)]
-                NUG_taskAssignment_T_i = self.baseline_NoUpdateGreedy(experts_copy_list_T_i)       
-                logging.debug("Baseline No Update Greedy Task Assignment: \n{}".format(NUG_taskAssignment_T_i))
-
-                #Compute Objective: Coverage - T_i
-                NUG_F_i = (lambda_val * sum(self.currentCoverageList)) - T_i
-                logging.info("Computed Baseline No-Update Greedy Task Assignment for T_i={}, F_i = {:.3f}".format(T_i, NUG_F_i))
-                F_noupdate_arr.append(NUG_F_i)
-                runtimeDict['noUpdateGreedy'] += time.perf_counter() - NUGi_startTime
-
             # stop search if max is found
             if F_i < F_i_prev:
+                F_vals['lazyGreedy'] = F_max
+                workLoad_vals['lazyGreedy'] = best_T_i
                 break
             F_i_prev = F_i
+
+        runtimeDict['lazyGreedy'] += time.perf_counter() - lazyGreedyi_start
+
+        ### Run Baselines ###
+        if 'random' in baselines:
+            randi_startTime = time.perf_counter()
+            F_vals['random'], workLoad_vals['random'] = self.computeBaselineRandom(lambda_val)
+            runtimeDict['random'] += time.perf_counter() - randi_startTime
+
+        if 'no_update_greedy' in baselines:
+            NUGi_startTime = time.perf_counter()
+            F_vals['noUpdateGreedy'], workLoad_vals['noUpdateGreedy'] = self.computeBaselineNoUpdateGreedy(lambda_val)
+            runtimeDict['noUpdateGreedy'] += time.perf_counter() - NUGi_startTime
+
 
         #Task Greedy baseline
         if 'task_greedy' in baselines:
             taskGreedy_startTime = time.perf_counter()
-            logging.info("Baseline Task Greedy Task Assignment")
-            taskGreedy_taskAssignment = self.baseline_TaskGreedy()       
-            logging.debug("Baseline Task Greedy Task Assignment: \n{}".format(taskGreedy_taskAssignment))
-
-            max_load = self.maximumExpertLoad(taskGreedy_taskAssignment)
-
-            #Compute Objective: (lambda)*Coverage - max_load
-            task_Greedy_F_i = (lambda_val * sum(self.currentCoverageList)) - max_load
-            logging.info("Baseline Task Greedy F_i = {:.3f}".format(task_Greedy_F_i))
+            F_vals['taskGreedy'] = self.computeBaselineTaskGreedy(lambda_val)
             runtimeDict['taskGreedy'] += time.perf_counter() - taskGreedy_startTime
 
-        #Plotting logic
-        if plot_flag:
-            f_objectives_arr = [F_arr]
-            f_objectives_labels = ['Lazy Greedy']
-            for b in baselines:
-                if b == 'random':
-                    f_objectives_arr.append(F_random_arr)
-                    f_objectives_labels.append('Random')
 
-                if b == 'no_update_greedy':
-                    f_objectives_arr.append(F_noupdate_arr)
-                    f_objectives_labels.append('No-Update Greedy')
-
-            self.thresholdPlotter(T_arr, f_objectives_arr, f_objectives_labels)
-
-        logging.info("Best Task Assignment is for max workload threshold: {}, F_i(max)={:.3f} \n".format(best_T_i, F_max))
+        logging.debug("Best Task Assignment is for max workload threshold: {}, F_i(max)={:.3f} \n".format(best_T_i, F_max))
 
         runtimeDict['total'] = time.perf_counter() - startTime
+        logging.info("\nAlgorithm Best Objective Values: Lazy Greedy = {}; No-Update-Greedy = {}; Task Greedy = {}; Random = {};\
+            \n".format(F_vals['lazyGreedy'], F_vals['noUpdateGreedy'], F_vals['taskGreedy'], F_vals['random']))
+
+        logging.info("\nAlgorithm Optimal Workload Values: Lazy Greedy = {}; No-Update-Greedy = {}; Task Greedy = {}; Random = {};\
+            \n".format(workLoad_vals['lazyGreedy'], workLoad_vals['noUpdateGreedy'], workLoad_vals['taskGreedy'], workLoad_vals['random']))
+
         logging.info("\nAlgorithm Runtimes: Total = {:.3f}s; Lazy Greedy = {:.3f}s; No-Update-Greedy = {:.3f}s; Task Greedy = {:.3f}s; Random = {:.3f}s;\
             \n".format(runtimeDict['total'], runtimeDict['lazyGreedy'], runtimeDict['noUpdateGreedy'], runtimeDict['taskGreedy'], runtimeDict['random']))
 
+        return runtimeDict, F_vals, workLoad_vals
 
-        return runtimeDict
+
+    def computeBaselineNoUpdateGreedy(self, lambda_val):
+        '''
+        Compute No-Update-Greedy Baseline
+        '''
+        F_max = 0 #store maximum objective value
+        best_T_i = None
+        F_i_prev = 0 #variable to store previous objective
+
+        for T_i in range(1, self.maxWorkloadThreshold+1):
+            #Create T_i copies of each expert, using a single list to keep track of copies
+            experts_copy_list_T_i = [T_i for i in range(self.n)]
+            NUG_taskAssignment_T_i = self.baseline_NoUpdateGreedy(experts_copy_list_T_i)       
+            logging.debug("Baseline No Update Greedy Task Assignment: \n{}".format(NUG_taskAssignment_T_i))
+
+            #Compute Objective: Coverage - T_i
+            NUG_F_i = (lambda_val * sum(self.currentCoverageList)) - T_i
+            logging.info("Computed Baseline No-Update Greedy Task Assignment for T_i={}, F_i = {:.3f}".format(T_i, NUG_F_i))
+
+            if NUG_F_i > F_max:
+                F_max = NUG_F_i
+                best_T_i = T_i
+
+            # stop search if max is found
+            if NUG_F_i < F_i_prev:
+                return F_max, best_T_i            
+            
+            F_i_prev = NUG_F_i
+
+        return F_max, best_T_i
+
+
+    def computeBaselineRandom(self, lambda_val):
+        '''
+        Compute No-Update-Greedy Baseline
+        '''
+        F_max = 0 #store maximum objective value
+        best_T_i = None
+        F_i_prev = 0 #variable to store previous objective
+
+        for T_i in range(1, self.maxWorkloadThreshold+1):
+            #Create T_i copies of each expert, using a single list to keep track of copies
+            experts_copy_list_T_i = [T_i for i in range(self.n)]
+            random_taskAssignment_T_i = self.baseline_Random(experts_copy_list_T_i)       
+            logging.debug("Baseline Random Task Assignment: \n{}".format(random_taskAssignment_T_i))
+
+            #Compute Objective: Coverage - T_i
+            random_F_i = (lambda_val * sum(self.currentCoverageList)) - T_i
+            logging.info("Computed Baseline Random Task Assignment for T_i={}, F_i = {:.3f}".format(T_i, random_F_i))
+
+            if random_F_i > F_max:
+                F_max = random_F_i
+                best_T_i = T_i
+
+            # stop search if max is found
+            if random_F_i < F_i_prev:
+                return F_max, best_T_i            
+            
+            F_i_prev = random_F_i
+
+        return F_max, best_T_i
+
+    
+    def computeBaselineTaskGreedy(self, lambda_val):
+        '''
+        Compute Task-Greedy Baseline
+        '''
+        taskGreedy_taskAssignment = self.baseline_TaskGreedy()       
+        logging.debug("Baseline Task Greedy Task Assignment: \n{}".format(taskGreedy_taskAssignment))
+
+        max_load = self.maximumExpertLoad(taskGreedy_taskAssignment)
+        logging.info("Computed Baseline Task Greedy Task Assignment, max load = {}".format(max_load))
+
+        #Compute Objective: (lambda)*Coverage - max_load
+        task_Greedy_F_i = (lambda_val * sum(self.currentCoverageList)) - max_load
+        logging.info("Baseline Task Greedy F_i = {:.3f}".format(task_Greedy_F_i))
+
+        return task_Greedy_F_i
