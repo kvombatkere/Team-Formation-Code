@@ -730,8 +730,8 @@ class TeamFormationProblem:
         logging.info("Best Task Assignment is for max workload threshold: {}, F_i(max)={:.3f} \n".format(best_T_i, F_max))
 
         runtimeDict['total'] = time.perf_counter() - startTime
-        logging.info("\nTotal Computation time = {:.3f}s; Lazy Greedy runtime = {:.3f}; Random baseline runtime = {:.3f}; \
-            No-Update-Greedy baseline runtime = {:.3f}s".format(runtimeDict['total'], runtimeDict['lazyGreedy'], runtimeDict['random'], runtimeDict['noUpdateGreedy']))
+        logging.info("\nAlgorithm Runtimes: Total = {:.3f}s; Lazy Greedy = {:.3f}s; No-Update-Greedy = {:.3f}s; Task Greedy = {:.3f}s; Random = {:.3f}s;\
+            \n".format(runtimeDict['total'], runtimeDict['lazyGreedy'], runtimeDict['noUpdateGreedy'], runtimeDict['taskGreedy'], runtimeDict['random']))
 
 
         return runtimeDict
