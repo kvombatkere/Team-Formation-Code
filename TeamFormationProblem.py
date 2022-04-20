@@ -607,13 +607,13 @@ class TeamFormationProblem:
         return taskAssignment_i
 
 
-    def computeTaskAssigment(self, baselines=['random', 'no_update_greedy', 'task_greedy'], plot_flag=False):
+    def computeTaskAssigment(self, algorithms=['lazy_greedy', 'random', 'no_update_greedy', 'task_greedy'], plot_flag=False):
         '''
         Compute a Task Assignment, of experts to tasks.
         Use m thresholds for the maximum load, and call a greedy method for each threshold
         Store this task assignment in self.taskAssignment
         ARGS:
-            baselines   : List of baselines to run, must be a list consisting of one or more of: ['random', 'no_update_greedy', 'task_greedy]
+            algorithms   : List of algorithms to run, must be a list consisting of one or more of: ['lazy_greedy','random','no_update_greedy','task_greedy]
             plot_flag   : Plot f vs. threshold, set False as default
         '''
         startTime = time.perf_counter()
@@ -638,53 +638,53 @@ class TeamFormationProblem:
         lambda_val = max_load_val/F_max_val
         logging.info("Pre-Computed Lambda value = {}".format(lambda_val))
 
+        if 'lazy_greedy' in algorithms:
+            logging.info('--------------------------Computing Greedy Task Assignment (Lazy Eval)------------------------------------')
+            lazyGreedyi_start = time.perf_counter()
+            for T_i in range(1, self.maxWorkloadThreshold+1):
+                #Create T_i copies of each expert, using a single list to keep track of copies
+                experts_copy_list_T_i = [T_i for i in range(self.n)]
 
-        logging.info('--------------------------Computing Greedy Task Assignment (Lazy Eval)------------------------------------')
-        lazyGreedyi_start = time.perf_counter()
-        for T_i in range(1, self.maxWorkloadThreshold+1):
-            #Create T_i copies of each expert, using a single list to keep track of copies
-            experts_copy_list_T_i = [T_i for i in range(self.n)]
+                #Greedily assign experts to tasks using this expert list
+                logging.debug("Computing Greedy Task Assignment (Lazy Eval) for max load, T_i={}".format(T_i))
+                taskAssignment_T_i = self.lazyGreedyTaskAssignment(experts_copy_list_T_i)       
+                logging.debug("Greedy Task Assignment (Lazy Eval): \n{}".format(taskAssignment_T_i))
+                
+                #Compute Objective: (lambda)*Coverage - T_i
+                F_i = (lambda_val * sum(self.currentCoverageList)) - T_i
+                logging.debug("F_i = {:.3f}".format(F_i))
+                logging.info("Computed Greedy Task Assignment (Lazy Eval) for T_i={}, F_i={:.3f}".format(T_i, F_i))
 
-            #Greedily assign experts to tasks using this expert list
-            logging.debug("Computing Greedy Task Assignment (Lazy Eval) for max load, T_i={}".format(T_i))
-            taskAssignment_T_i = self.lazyGreedyTaskAssignment(experts_copy_list_T_i)       
-            logging.debug("Greedy Task Assignment (Lazy Eval): \n{}".format(taskAssignment_T_i))
-            
-            #Compute Objective: (lambda)*Coverage - T_i
-            F_i = (lambda_val * sum(self.currentCoverageList)) - T_i
-            logging.debug("F_i = {:.3f}".format(F_i))
-            logging.info("Computed Greedy Task Assignment (Lazy Eval) for T_i={}, F_i={:.3f}".format(T_i, F_i))
+                if F_i > F_max:
+                    F_max = F_i
+                    self.taskAssignment = taskAssignment_T_i
+                    best_T_i = T_i
 
-            if F_i > F_max:
-                F_max = F_i
-                self.taskAssignment = taskAssignment_T_i
-                best_T_i = T_i
+                # stop search if max is found
+                if F_i < F_i_prev:
+                    F_vals['lazyGreedy'] = F_max
+                    workLoad_vals['lazyGreedy'] = best_T_i
+                    break
+                F_i_prev = F_i
 
-            # stop search if max is found
-            if F_i < F_i_prev:
-                F_vals['lazyGreedy'] = F_max
-                workLoad_vals['lazyGreedy'] = best_T_i
-                break
-            F_i_prev = F_i
-
-        runtimeDict['lazyGreedy'] += time.perf_counter() - lazyGreedyi_start
+            runtimeDict['lazyGreedy'] += time.perf_counter() - lazyGreedyi_start
 
         ### Run Baselines ###
-        if 'random' in baselines:
+        if 'random' in algorithms:
             randi_startTime = time.perf_counter()
             F_vals['random'], workLoad_vals['random'] = self.computeBaselineRandom(lambda_val)
             runtimeDict['random'] += time.perf_counter() - randi_startTime
 
-        if 'no_update_greedy' in baselines:
+        if 'no_update_greedy' in algorithms:
             NUGi_startTime = time.perf_counter()
             F_vals['noUpdateGreedy'], workLoad_vals['noUpdateGreedy'] = self.computeBaselineNoUpdateGreedy(lambda_val)
             runtimeDict['noUpdateGreedy'] += time.perf_counter() - NUGi_startTime
 
 
         #Task Greedy baseline
-        if 'task_greedy' in baselines:
+        if 'task_greedy' in algorithms:
             taskGreedy_startTime = time.perf_counter()
-            F_vals['taskGreedy'] = self.computeBaselineTaskGreedy(lambda_val)
+            F_vals['taskGreedy'], workLoad_vals['taskGreedy'] = self.computeBaselineTaskGreedy(lambda_val)
             runtimeDict['taskGreedy'] += time.perf_counter() - taskGreedy_startTime
 
 
@@ -779,4 +779,4 @@ class TeamFormationProblem:
         task_Greedy_F_i = (lambda_val * sum(self.currentCoverageList)) - max_load
         logging.info("Baseline Task Greedy F_i = {:.3f}".format(task_Greedy_F_i))
 
-        return task_Greedy_F_i
+        return task_Greedy_F_i, max_load
