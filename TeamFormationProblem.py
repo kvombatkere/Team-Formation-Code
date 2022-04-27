@@ -32,7 +32,7 @@ class TeamFormationProblem:
     self.maxWorkloadThreshold   : thresholds for max expert workload to check upto
     '''
 
-    def __init__(self, m_tasks, n_experts, max_workload_threshold=100):
+    def __init__(self, m_tasks, n_experts, max_workload_threshold=200):
         '''
         Initialize problem instance with m tasks, n experts
         ARGS:
@@ -365,32 +365,6 @@ class TeamFormationProblem:
 
         return taskAssignment_i
 
-    # def initializeMaxHeap_task(self, task_j):
-    #     '''
-    #     Initialize the max heap for the task greedy baseline
-    #     Creates and updates self.maxHeap_task_j
-    #     ARGS:
-    #         task_j : index of task to create max heap for
-    #     '''
-    #     self.maxHeap_task_j = []
-    #     heapify(self.maxHeap_task_j)
-
-    #     T_j = self.tasks[task_j]
-
-    #     for i, E_i in enumerate(self.experts):
-    #         expert_skills = set(E_i)    #Get expert E_i skills as set
-    #         task_skills = set(T_j)    #Get task T_j skills as set
-            
-    #         #Compute initial coverage of E_i-T_J edge
-    #         edge_coverage = len(expert_skills.intersection(task_skills))/len(task_skills)
-    #         heapItem = (edge_coverage*-1, i, task_j)
-
-    #         heappush(self.maxHeap_task_j, heapItem)
-    
-    #     logging.info("Max Heap Task j: {}".format(self.maxHeap_task_j))
-
-    #     return    
-
 
     def getBestExpertForTaskGreedy(self, taskAssignment, j):
         '''
@@ -407,10 +381,12 @@ class TeamFormationProblem:
         max_edge_coverage = 0
 
         T_j = self.tasks[j]
-        
-        for i, E_i in enumerate(np.random.permutation(self.experts)):
+
+        #traverse experts in random order to assign uniformly
+        for i in np.random.permutation(self.n):
             #Check if this expert is not yet assigned to T_j (A[i,j] = 0)
             if (taskAssignment[i,j] == 0):
+                E_i = self.experts[i]
                 #Retrieve union of skills of all experts assigned to T_j and add expert E_i
                 expert_skills = self.currentExpertUnionSkills[j].union(set(E_i))
                 task_skills = set(T_j)    #Get task skills as a set
@@ -425,10 +401,6 @@ class TeamFormationProblem:
                     bestExpertTaskEdge['expert_index'] = i
                     bestExpertTaskEdge['task_index'] = j
                     
-                    #Return immediately if all skills in a task are covered
-                    if max_edge_coverage == 1:
-                        return max_edge_coverage, bestExpertTaskEdge
-
         return max_edge_coverage, bestExpertTaskEdge
 
 
@@ -455,8 +427,8 @@ class TeamFormationProblem:
             #Get first best expert-task assignment and delta coverage value
             deltaCoverage, best_ExpertTaskEdge = self.getBestExpertForTaskGreedy(taskAssignment, j)
 
-            #Assign edges until there is no more coverage possible or no experts left or task is already covered
-            while (0 < deltaCoverage) and (sum(expert_copies_list) != 0) and (self.currentCoverageList[j] != 1):
+            #Assign edges until there is no more coverage possible or no experts left 
+            while (0 < deltaCoverage) and (sum(expert_copies_list) != 0):
                 #Add edge to assignment
                 taskAssignment[best_ExpertTaskEdge['expert_index'], best_ExpertTaskEdge['task_index']] = 1
 
@@ -477,14 +449,14 @@ class TeamFormationProblem:
 
         return taskAssignment
 
-
-    def initializeMaxHeap(self):
+    
+    def createMaxHeap(self):
         '''
         Initialize the max heap for the lazy greedy evaluation, by evaluating coverage of all expert-task edges
-        Creates and updates self.maxHeap
+        Creates and updates self.maxHeapOriginal
         '''
-        self.maxHeap = []
-        heapify(self.maxHeap)
+        self.maxHeapOriginal = []
+        heapify(self.maxHeapOriginal)
 
         for i, E_i in enumerate(self.experts):
             for j, T_j in enumerate(self.tasks):
@@ -495,9 +467,20 @@ class TeamFormationProblem:
                 edge_coverage = len(expert_skills.intersection(task_skills))/len(task_skills)
                 heapItem = (edge_coverage*-1, i, j)
 
-                heappush(self.maxHeap, heapItem)
+                heappush(self.maxHeapOriginal, heapItem)
         
-        logging.debug("Max Heap: {}".format(self.maxHeap))
+        logging.debug("Max Heap created for Lazy Greedy: {}".format(self.maxHeapOriginal))
+
+        return  
+
+
+    def initializeMaxHeap(self):
+        '''
+        Initialize the max heap for the specific threshold lazy greedy evaluation
+        makes a copy of self.maxHeapOriginal and stores in self.maxHeap
+        '''
+        self.maxHeap = self.maxHeapOriginal.copy()
+        logging.debug("Created Max Heap for iteration: {}".format(self.maxHeap))
 
         return        
 
@@ -629,6 +612,7 @@ class TeamFormationProblem:
         workLoad_vals = {'lazyGreedy': None, 'noUpdateGreedy': None, 'taskGreedy': None, 'random': None}
 
         #Pre-compute lambda
+        self.createMaxHeap()
         lambda_val = 0
         experts_copy_list_lambda = [self.m for i in range(self.n)]
         taskAssignment_T_i = self.lazyGreedyTaskAssignment(experts_copy_list_lambda)
@@ -641,6 +625,7 @@ class TeamFormationProblem:
         if 'lazy_greedy' in algorithms:
             logging.info('--------------------------Computing Greedy Task Assignment (Lazy Eval)------------------------------------')
             lazyGreedyi_start = time.perf_counter()
+
             for T_i in range(1, self.maxWorkloadThreshold+1):
                 #Create T_i copies of each expert, using a single list to keep track of copies
                 experts_copy_list_T_i = [T_i for i in range(self.n)]
@@ -711,6 +696,8 @@ class TeamFormationProblem:
         best_T_i = None
         F_i_prev = 0 #variable to store previous objective
 
+        self.createMaxHeap()
+
         for T_i in range(1, self.maxWorkloadThreshold+1):
             #Create T_i copies of each expert, using a single list to keep track of copies
             experts_copy_list_T_i = [T_i for i in range(self.n)]
@@ -736,11 +723,11 @@ class TeamFormationProblem:
 
     def computeBaselineRandom(self, lambda_val):
         '''
-        Compute No-Update-Greedy Baseline
+        Compute Random Baseline
         '''
         F_max = 0 #store maximum objective value
         best_T_i = None
-        F_i_prev = 0 #variable to store previous objective
+        F_i_prev = -100 #variable to store previous objective
 
         for T_i in range(1, self.maxWorkloadThreshold+1):
             #Create T_i copies of each expert, using a single list to keep track of copies
