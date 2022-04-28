@@ -1,0 +1,16 @@
+IMDB dataset Team-Formation Algorithms: 04-28-01:37:45
+
+IMDB movieYear = 2015, Experts = 100, Tasks = 600
+Algorithm Objectives (F_max): Lazy Greedy = 134.21175103254436; No-Update-Greedy = 34.781532955562184; Task Greedy = 47.41291579679901; Random = 31.380858390044203;                
+Algorithm optimal workloads: Lazy Greedy = 15; No-Update-Greedy = 26; Task Greedy = 85; Random = 7;                
+Algorithm Runtimes: Total = 7.513s; Lazy Greedy = 2.961s; No-Update-Greedy = 3.626s; Task Greedy = 0.327s; Random = 0.296s;                
+
+IMDB movieYear = 2018, Experts = 100, Tasks = 600
+Algorithm Objectives (F_max): Lazy Greedy = 146.5784684678067; No-Update-Greedy = 54.06345290738679; Task Greedy = 62.03039350355547; Random = 38.362234517933054;                
+Algorithm optimal workloads: Lazy Greedy = 17; No-Update-Greedy = 40; Task Greedy = 79; Random = 7;                
+Algorithm Runtimes: Total = 12.859s; Lazy Greedy = 3.405s; No-Update-Greedy = 8.551s; Task Greedy = 0.313s; Random = 0.295s;                
+
+IMDB movieYear = 2020, Experts = 100, Tasks = 600
+Algorithm Objectives (F_max): Lazy Greedy = 116.25081194861477; No-Update-Greedy = 28.924845070422563; Task Greedy = 67.16668008048302; Random = 34.690203993189925;                
+Algorithm optimal workloads: Lazy Greedy = 16; No-Update-Greedy = 26; Task Greedy = 42; Random = 12;                
+Algorithm Runtimes: Total = 7.555s; Lazy Greedy = 2.855s; No-Update-Greedy = 3.343s; Task Greedy = 0.301s; Random = 0.803s;                

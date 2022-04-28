@@ -1,0 +1,16 @@
+Bibsonomy dataset Team-Formation Algorithms: 04-28-01:38:13
+
+Bibsonomy paperYear = 2010, Experts = 200, Tasks = 500
+Algorithm Objectives (F_max): Lazy Greedy = 46.88939140919745; No-Update-Greedy = 27.68555359577269; Task Greedy = 4.018149142140103; Random = 2.6449704450607685;                
+Algorithm optimal workloads: Lazy Greedy = 9; No-Update-Greedy = 11; Task Greedy = 20; Random = 4;                
+Algorithm Runtimes: Total = 5.374s; Lazy Greedy = 2.339s; No-Update-Greedy = 1.995s; Task Greedy = 0.410s; Random = 0.212s;                
+
+Bibsonomy paperYear = 2015, Experts = 200, Tasks = 500
+Algorithm Objectives (F_max): Lazy Greedy = 46.4028364328298; No-Update-Greedy = 32.280398907590104; Task Greedy = 9.437525239734704; Random = 0.8989999931553263;                
+Algorithm optimal workloads: Lazy Greedy = 8; No-Update-Greedy = 14; Task Greedy = 13; Random = 3;                
+Algorithm Runtimes: Total = 6.629s; Lazy Greedy = 1.997s; No-Update-Greedy = 3.795s; Task Greedy = 0.368s; Random = 0.121s;                
+
+Bibsonomy paperYear = 2020, Experts = 177, Tasks = 500
+Algorithm Objectives (F_max): Lazy Greedy = 34.69270072992706; No-Update-Greedy = 27.927007299270137; Task Greedy = 10.096125772038192; Random = 0;                
+Algorithm optimal workloads: Lazy Greedy = 11; No-Update-Greedy = 16; Task Greedy = 27; Random = None;                
+Algorithm Runtimes: Total = 7.426s; Lazy Greedy = 0.980s; No-Update-Greedy = 5.856s; Task Greedy = 0.355s; Random = 0.027s;                

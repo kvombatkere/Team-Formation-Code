@@ -428,7 +428,7 @@ class TeamFormationProblem:
             deltaCoverage, best_ExpertTaskEdge = self.getBestExpertForTaskGreedy(taskAssignment, j)
 
             #Assign edges until there is no more coverage possible or no experts left 
-            while (0 < deltaCoverage) and (sum(expert_copies_list) != 0):
+            while (0.66 <= deltaCoverage) and (sum(expert_copies_list) != 0):
                 #Add edge to assignment
                 taskAssignment[best_ExpertTaskEdge['expert_index'], best_ExpertTaskEdge['task_index']] = 1
 
@@ -443,6 +443,7 @@ class TeamFormationProblem:
                 deltaCoverage, best_ExpertTaskEdge = self.getBestExpertForTaskGreedy(taskAssignment, j)
 
                 logging.debug("deltaCoverage={:.1f}, best_ExpertTaskEdge={}".format(deltaCoverage, best_ExpertTaskEdge))
+
 
         runTime = time.perf_counter() - startTime
         logging.debug("Greedy Task Assignment computation time = {:.1f} seconds".format(runTime))
