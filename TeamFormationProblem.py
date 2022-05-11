@@ -800,10 +800,10 @@ class TeamFormationProblem:
         logging.info("Pre-Computed Lambda value = {:.3f}".format(lambda_val))
 
         #Track lambda values for l, l/2, l/3... 
-        lambda_vals = [1,2,3,4,5,6]
+        lambda_vals = [lambda_val, 0.2, 0.5, 1, 2, 5, 10, 20]
         lambdaFiDict = {}
         for l in lambda_vals:
-            lambdaFiDict[lambda_val/l] = []
+            lambdaFiDict[l] = []
 
         if 'lazy_greedy' in algorithms:
             logging.info('--------------------------Computing Greedy Task Assignment (Lazy Eval)------------------------------------')
