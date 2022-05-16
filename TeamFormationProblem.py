@@ -607,6 +607,7 @@ class TeamFormationProblem:
         
         #Track Runtime for Lazy Greedy, Random and No-Update-Greedy baseline
         runtimeDict = {'lazyGreedy': 0, 'noUpdateGreedy': 0, 'taskGreedy': 0, 'random': 0, 'total': 0}
+        lazyGreedyCoverageList = []
 
         #Track Objective and Max Load values
         F_vals = {'lazyGreedy': None, 'noUpdateGreedy': None, 'taskGreedy': None, 'random': None}
@@ -614,14 +615,16 @@ class TeamFormationProblem:
 
         #Pre-compute lambda
         self.createMaxHeap()
-        lambda_val = 0
-        experts_copy_list_lambda = [self.m for i in range(self.n)]
-        taskAssignment_T_i = self.lazyGreedyTaskAssignment(experts_copy_list_lambda)
+        # lambda_val = 0
+        # experts_copy_list_lambda = [self.m for i in range(self.n)]
+        # taskAssignment_T_i = self.lazyGreedyTaskAssignment(experts_copy_list_lambda)
         
-        max_load_val = self.m - min(experts_copy_list_lambda)
-        F_max_val = sum(self.currentCoverageList)
-        lambda_val = max_load_val/F_max_val
-        logging.info("Pre-Computed Lambda value = {:.3f}".format(lambda_val))
+        # max_load_val = self.m - min(experts_copy_list_lambda)
+        # F_max_val = sum(self.currentCoverageList)
+        # lambda_val = max_load_val/F_max_val 
+        # logging.info("Pre-Computed Lambda value = {:.3f}".format(lambda_val))
+
+        lambda_val = 100
 
         if 'lazy_greedy' in algorithms:
             logging.info('--------------------------Computing Greedy Task Assignment (Lazy Eval)------------------------------------')
@@ -637,7 +640,10 @@ class TeamFormationProblem:
                 logging.debug("Greedy Task Assignment (Lazy Eval): \n{}".format(taskAssignment_T_i))
                 
                 #Compute Objective: (lambda)*Coverage - T_i
-                F_i = (lambda_val * sum(self.currentCoverageList)) - T_i
+                C_i = sum(self.currentCoverageList)
+                F_i = (lambda_val * C_i) - T_i
+                lazyGreedyCoverageList.append(C_i)
+
                 logging.debug("F_i = {:.3f}".format(F_i))
                 logging.info("Computed Greedy Task Assignment (Lazy Eval) for T_i={}, F_i={:.3f}".format(T_i, F_i))
 
@@ -686,7 +692,7 @@ class TeamFormationProblem:
         logging.info("\nAlgorithm Runtimes: Total = {:.3f}s; Lazy Greedy = {:.3f}s; No-Update-Greedy = {:.3f}s; Task Greedy = {:.3f}s; Random = {:.3f}s;\
             \n".format(runtimeDict['total'], runtimeDict['lazyGreedy'], runtimeDict['noUpdateGreedy'], runtimeDict['taskGreedy'], runtimeDict['random']))
 
-        return runtimeDict, F_vals, workLoad_vals
+        return runtimeDict, F_vals, workLoad_vals, lazyGreedyCoverageList
 
 
     def computeBaselineNoUpdateGreedy(self, lambda_val):
@@ -800,7 +806,7 @@ class TeamFormationProblem:
         logging.info("Pre-Computed Lambda value = {:.3f}".format(lambda_val))
 
         #Track lambda values for l, l/2, l/3... 
-        lambda_vals = [lambda_val, 0.2, 0.5, 1, 2, 5, 10, 20]
+        lambda_vals = [lambda_val, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100]
         lambdaFiDict = {}
         for l in lambda_vals:
             lambdaFiDict[l] = []
@@ -814,6 +820,8 @@ class TeamFormationProblem:
             for lVal in lambdaFiDict.keys():
                 F_max = 0 #store maximum objective value
                 best_T_i = None
+                F_i_prev = 0 #variable to store previous objective
+                C_max = 0
 
                 for T_i in range(1, self.maxWorkloadThreshold+1):
                     #Create T_i copies of each expert, using a single list to keep track of copies
@@ -831,12 +839,17 @@ class TeamFormationProblem:
 
                     if F_i > F_max:
                         F_max = F_i
+                        C_max = sum(self.currentCoverageList)
                         self.taskAssignment = taskAssignment_T_i
                         best_T_i = T_i
 
+                    # stop search if max is found
+                    if F_i < F_i_prev:
+                        break
+                    F_i_prev = F_i
                     lambdaFiDict[lVal].append(F_i)
 
-                F_maxArr.append(F_max)
+                F_maxArr.append(C_max)
                 T_maxArr.append(best_T_i)
                 logging.info("Computed Lazy Greedy Task Assignment for Lambda={:.3f}, F_i={:.3f}, T_max={}".format(lVal, F_max, best_T_i))
 
