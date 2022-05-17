@@ -266,10 +266,10 @@ class TeamFormationProblem:
         #Initialize expert union skills list as an empty list of sets
         self.currentExpertUnionSkills = [set() for j in range(self.m)]
 
-        #Assign each expert to random tasks
+        #Assign each expert to m/4 random tasks
         for i, E_i in enumerate(self.experts):
             counter = 0
-            while counter < self.m:
+            while counter < 0.2*self.m:
 
                 j = np.random.randint(0, self.m)
                 counter += 1
@@ -287,15 +287,17 @@ class TeamFormationProblem:
                     T_j_coverage = len(expert_skills.intersection(task_skills))/len(task_skills)
                     delta_coverage = T_j_coverage - self.currentCoverageList[j]
 
-                    #Add edge to task assignment
-                    expertTaskEdge = {'expert_index':i, 'task_index':j}
+                    #Add edge to assignment and update if deltaCoverage > x
+                    if delta_coverage > 0.9:
+                        #Add edge to task assignment
+                        expertTaskEdge = {'expert_index':i, 'task_index':j}
 
-                    taskAssignment_i[expertTaskEdge['expert_index'], expertTaskEdge['task_index']] = 1
+                        taskAssignment_i[expertTaskEdge['expert_index'], expertTaskEdge['task_index']] = 1
 
-                    #Update current coverage list and expert union skills list
-                    self.updateCurrentCoverageList(expertTaskEdge, delta_coverage)
-                    self.updateExpertUnionSkillsList(expertTaskEdge)
-                    logging.debug("Current Coverage List = {}".format(self.currentCoverageList))
+                        #Update current coverage list and expert union skills list
+                        self.updateCurrentCoverageList(expertTaskEdge, delta_coverage)
+                        self.updateExpertUnionSkillsList(expertTaskEdge)
+                        logging.debug("Current Coverage List = {}".format(self.currentCoverageList))
 
 
         runTime = time.perf_counter() - startTime
@@ -323,7 +325,7 @@ class TeamFormationProblem:
         self.currentExpertUnionSkills = [set() for j in range(self.m)]
         
         #Assign edges from heap until coverage stabilizes or everyone is assigned
-        while len(self.maxHeap) > 0 and (deltaCoverage > 0):
+        while len(self.maxHeap) > 0.8*len(self.maxHeapOriginal):
             #Pop top edge from maxHeap
             top_edge = heappop(self.maxHeap)
             top_ExpertTaskEdge = {'expert_index': top_edge[1], 'task_index': top_edge[2]}
@@ -336,13 +338,14 @@ class TeamFormationProblem:
             edge_coverage = len(expert_skills.intersection(task_skills))/len(task_skills)
             deltaCoverage = edge_coverage - self.currentCoverageList[top_ExpertTaskEdge['task_index']]
 
-            #Add edge to assignment
-            taskAssignment_i[top_ExpertTaskEdge['expert_index'], top_ExpertTaskEdge['task_index']] = 1
-
-            #Update coverage list
-            self.updateCurrentCoverageList(top_ExpertTaskEdge, deltaCoverage)
-            self.updateExpertUnionSkillsList(top_ExpertTaskEdge)
-            logging.debug("Current Coverage List = {}".format(self.currentCoverageList))
+            #Add edge to assignment and update if deltaCoverage > 0.9 and task isn't already covered
+            if deltaCoverage > 0.8:
+                
+                taskAssignment_i[top_ExpertTaskEdge['expert_index'], top_ExpertTaskEdge['task_index']] = 1
+                #Update coverage list
+                self.updateCurrentCoverageList(top_ExpertTaskEdge, deltaCoverage)
+                self.updateExpertUnionSkillsList(top_ExpertTaskEdge)
+                logging.debug("Current Coverage List = {}".format(self.currentCoverageList))
 
 
         runTime = time.perf_counter() - startTime
@@ -413,7 +416,7 @@ class TeamFormationProblem:
             deltaCoverage, best_ExpertTaskEdge = self.getBestExpertForTaskGreedy(taskAssignment, j)
 
             #Assign edges until there is no more coverage possible or no experts left 
-            while (0.66 <= deltaCoverage) and (sum(expert_copies_list) != 0):
+            while (deltaCoverage > 0.7) and (sum(expert_copies_list) != 0):
                 #Add edge to assignment
                 taskAssignment[best_ExpertTaskEdge['expert_index'], best_ExpertTaskEdge['task_index']] = 1
 
@@ -576,7 +579,7 @@ class TeamFormationProblem:
         return taskAssignment_i
 
 
-    def computeTaskAssigment(self, algorithms=['lazy_greedy', 'random', 'no_update_greedy', 'task_greedy'], lambdaVal=1, plot_flag=False):
+    def computeTaskAssigment(self, algorithms=['lazy_greedy', 'random', 'no_update_greedy', 'task_greedy'], lambdaVal=1):
         '''
         Compute a Task Assignment, of experts to tasks.
         Use m thresholds for the maximum load, and call a greedy method for each threshold
@@ -657,7 +660,6 @@ class TeamFormationProblem:
             F_vals['noUpdateGreedy'], workLoad_vals['noUpdateGreedy'] = self.computeBaselineNoUpdateGreedy(lambda_val)
             runtimeDict['noUpdateGreedy'] += time.perf_counter() - NUGi_startTime
 
-
         #Task Greedy baseline
         if 'task_greedy' in algorithms:
             taskGreedy_startTime = time.perf_counter()
@@ -708,7 +710,7 @@ class TeamFormationProblem:
 
         #Compute Objective: Coverage - T_i
         random_F = (lambda_val * sum(self.currentCoverageList)) - maxLoad
-        logging.info("Computed Random Task Assignment for, F_i = {:.3f}".format(random_F))
+        logging.info("Computed Random Task Assignment objective, F_i = {:.3f}".format(random_F))
 
         return random_F, maxLoad
 
