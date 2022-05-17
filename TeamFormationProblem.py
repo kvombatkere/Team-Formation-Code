@@ -845,40 +845,34 @@ class TeamFormationProblem:
         return Ti_arr, lambdaFiDict, T_maxArr, F_maxArr
 
 
-    def getCoverageValues(self, algorithms=['lazy_greedy', 'random', 'no_update_greedy']):
+    def getCoverageValues(self):
         #Track coverage list
-        coverageListDict = {'lazyGreedy': [], 'noUpdateGreedy': [], 'taskGreedy': [], 'random': []}
+        coverageList = []
         self.createMaxHeap()
+        
+        logging.info("Computing Lazy Greedy coverage list")
+        for T_i in range(1, self.maxWorkloadThreshold+1):
+            #Create T_i copies of each expert, using a single list to keep track of copies
+            experts_copy_list_T_i = [T_i for i in range(self.n)]
+            taskAssignment_T_i = self.lazyGreedyTaskAssignment(experts_copy_list_T_i)       
+            C_i = sum(self.currentCoverageList)
+            coverageList.append(C_i)
+            logging.info("Computed Threshold Greedy task assignment for T_i={}, C_i={:.3f}".format(T_i, C_i))
 
-        if 'lazy_greedy' in algorithms:
-            logging.info("Computing Lazy Greedy coverage list")
-            for T_i in range(1, self.maxWorkloadThreshold+1):
-                #Create T_i copies of each expert, using a single list to keep track of copies
-                experts_copy_list_T_i = [T_i for i in range(self.n)]
-                taskAssignment_T_i = self.lazyGreedyTaskAssignment(experts_copy_list_T_i)       
-                C_i = sum(self.currentCoverageList)
-                coverageListDict['lazyGreedy'].append(C_i)
+        return coverageList
 
-        ### Run Baselines ###
-        if 'random' in algorithms:
-            logging.info("Computing Random coverage list")
-            for T_i in range(1, self.maxWorkloadThreshold+1):
-                #Create T_i copies of each expert, using a single list to keep track of copies
-                experts_copy_list_T_i = [T_i for i in range(self.n)]
-                random_taskAssignment_T_i = self.baseline_Random(experts_copy_list_T_i)       
-                C_i = sum(self.currentCoverageList)
-                coverageListDict['random'].append(C_i)
+    def getStepCoverageValues(self):
+        #Track coverage list
+        coverageDict = {}
+        self.createMaxHeap()
+        
+        logging.info("Computing Lazy Greedy coverage list")
+        for T_i in range(10, 211, 20):
+            #Create T_i copies of each expert, using a single list to keep track of copies
+            experts_copy_list_T_i = [T_i for i in range(self.n)]
+            taskAssignment_T_i = self.lazyGreedyTaskAssignment(experts_copy_list_T_i)       
+            C_i = sum(self.currentCoverageList)
+            coverageDict[T_i] = C_i
+            logging.info("Computed Threshold Greedy task assignment for T_i={}, C_i={:.3f}".format(T_i, C_i))
 
-        if 'no_update_greedy' in algorithms:
-            logging.info("Computing No Update Greedy coverage list")
-            for T_i in range(1, self.maxWorkloadThreshold+1):
-                #Create T_i copies of each expert, using a single list to keep track of copies
-                experts_copy_list_T_i = [T_i for i in range(self.n)]
-                NUG_taskAssignment_T_i = self.baseline_NoUpdateGreedy(experts_copy_list_T_i)          
-                C_i = sum(self.currentCoverageList)
-                coverageListDict['noUpdateGreedy'].append(C_i)        
-
-        return coverageListDict
-
-
-
+        return coverageDict
