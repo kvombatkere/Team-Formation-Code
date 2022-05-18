@@ -269,7 +269,7 @@ class TeamFormationProblem:
         #Assign each expert to m/4 random tasks
         for i, E_i in enumerate(self.experts):
             counter = 0
-            while counter < self.m:
+            while counter < 0.01*self.m:
 
                 j = np.random.randint(0, self.m)
                 counter += 1
@@ -288,7 +288,7 @@ class TeamFormationProblem:
                     delta_coverage = T_j_coverage - self.currentCoverageList[j]
 
                     #Add edge to assignment and update if deltaCoverage > x
-                    if delta_coverage > 0.55:
+                    if delta_coverage == 1:
                         #Add edge to task assignment
                         expertTaskEdge = {'expert_index':i, 'task_index':j}
 
@@ -323,10 +323,10 @@ class TeamFormationProblem:
         #Initialize current coverage list and expert union skills list as an empty list of sets
         self.currentCoverageList = [0 for i in range(self.m)]
         self.currentExpertUnionSkills = [set() for j in range(self.m)]
-        expert_copies_list = [self.maxWorkloadThreshold/3 for i in range(self.n)]
+        expert_copies_list = [self.maxWorkloadThreshold*1.5 for i in range(self.n)]
         
         #Assign edges from heap until coverage stabilizes or everyone is assigned
-        while len(self.maxHeap) > 0: #0.1*len(self.maxHeapOriginal):
+        while len(self.maxHeap) > 0.7*len(self.maxHeapOriginal):
             #Pop top edge from maxHeap
             top_edge = heappop(self.maxHeap)
             top_ExpertTaskEdge = {'expert_index': top_edge[1], 'task_index': top_edge[2]}
@@ -340,7 +340,7 @@ class TeamFormationProblem:
             deltaCoverage = edge_coverage - self.currentCoverageList[top_ExpertTaskEdge['task_index']]
 
             #Add edge to assignment and update if deltaCoverage > 0.9 and task isn't already covered
-            if deltaCoverage > 0.55 and expert_copies_list[top_ExpertTaskEdge['expert_index']] != 0:
+            if deltaCoverage == 1 and expert_copies_list[top_ExpertTaskEdge['expert_index']] != 0:
                 taskAssignment_i[top_ExpertTaskEdge['expert_index'], top_ExpertTaskEdge['task_index']] = 1
                 #Decrement expert copy
                 expert_copies_list[top_ExpertTaskEdge['expert_index']] -= 1
@@ -419,7 +419,7 @@ class TeamFormationProblem:
             deltaCoverage, best_ExpertTaskEdge = self.getBestExpertForTaskGreedy(taskAssignment, j)
 
             #Assign edges until there is no more coverage possible or no experts left 
-            while (deltaCoverage > 0) and (sum(expert_copies_list) != 0):
+            while (deltaCoverage == 1) and (sum(expert_copies_list) != 0):
                 #Add edge to assignment
                 taskAssignment[best_ExpertTaskEdge['expert_index'], best_ExpertTaskEdge['task_index']] = 1
 
