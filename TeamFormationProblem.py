@@ -441,6 +441,20 @@ class TeamFormationProblem:
 
         return taskAssignment
 
+
+    def lp_taskCoverage(self):
+        '''
+        Solve the linear program using the Algorithm outlined in Power in Unity
+
+        '''
+        startTime = time.perf_counter()
+        
+
+        runTime = time.perf_counter() - startTime
+        logging.debug("LP solver Assignment computation time = {:.1f} seconds".format(runTime))
+
+
+
     
     def createMaxHeap(self):
         '''
