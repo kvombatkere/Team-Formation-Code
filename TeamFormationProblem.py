@@ -75,6 +75,70 @@ class TeamFormationProblem:
         return assigned_experts_indices
 
 
+    def getExpertSkillSet(self, expertIndices):
+        '''
+        Given a list of expert indices, return union of all expert skills
+        ARGS:
+            expertIndices   : list of indices of experts
+        RETURN:
+            expert_skillset    : Union of skills of all experts, returned as a set
+        '''
+        expert_skillset = set()
+        for expert_index in expertIndices:
+            expert_i_skills = set(self.experts[expert_index])
+            expert_skillset = expert_skillset.union(expert_i_skills)
+
+        return expert_skillset
+
+
+    def singleTaskCoverage(self, taskAssignment, task_index):
+        '''
+        Given a taskAssignment, compute the task coverage of a single task 
+        ARGS:
+            taskAssignment  : current task assigment
+            task_index  : index of task in original list m_tasks
+        RETURN:
+            task_coverage   : task coverage of a single task
+        '''
+        #Get union of skills of experts assigned to task
+        task_assigned_experts_indices = self.getExpertsAssignedToTask(taskAssignment, task_index)
+        all_expert_skills = self.getExpertSkillSet(task_assigned_experts_indices)
+
+        task_skills = set(self.tasks[task_index])
+        logging.debug("Single Task Coverage Debug: task index={}, task skills={}, expert skills={}".format(task_index, task_skills, all_expert_skills))
+        
+        #Compute coverage
+        task_coverage = len(all_expert_skills.intersection(task_skills))/len(task_skills)
+        
+        return task_coverage
+
+
+    def computeTotalTaskCoverage(self, taskAssignment, list_flag = False):
+        '''
+        Given a taskAssignment, compute the total task coverage of the assigment
+        ARGS:
+            taskAssignment  : (n x m) matrix task assigment of experts to tasks
+            list_flag  : flag to determine whether to output total coverage or list
+        RETURN:
+            total_task_coverage_value   : total task coverage across all tasks
+            total_task_coverage_list    : list of all m task coverage values
+        '''
+        task_assigment = taskAssignment
+        
+        total_task_coverage_value = 0
+        total_task_coverage_list = []
+
+        for index_task, t in enumerate(self.tasks):
+            cov = self.singleTaskCoverage(task_assigment, index_task)
+            total_task_coverage_value += cov
+            total_task_coverage_list.append(cov)
+
+        if list_flag:
+            return total_task_coverage_list
+        
+        else:
+            return total_task_coverage_value
+
     
     def displayTaskAssignment(self, taskAssignment):
         '''
@@ -469,7 +533,7 @@ class TeamFormationProblem:
                 skill_index = int(skill)
                 experts_mat[expert_index][skill_index] = 1
 
-        print("Generated expert-skill matrix, shape = {}".format(experts_mat.shape))
+        logging.info("Generated expert-skill matrix, shape = {}".format(experts_mat.shape))
         
         #Create (m_tasks, n_skills) matrix
         tasks_mat = np.zeros((len(self.tasks), s_skills), dtype=np.int8)
@@ -486,10 +550,10 @@ class TeamFormationProblem:
                     allTasksCoverable = False
                     tasks_not_coverable.append(task_index)
         
-        print("Generated task-skill matrix, shape = {}".format(tasks_mat.shape))
+        logging.info("Generated task-skill matrix, shape = {}".format(tasks_mat.shape))
 
         if not allTasksCoverable:
-            print("{} Tasks not fully coverable: {}".format(len(tasks_not_coverable), tasks_not_coverable))
+            logging.info("{} Tasks not fully coverable: {}".format(len(tasks_not_coverable), tasks_not_coverable))
         
         return experts_mat, tasks_mat, tasks_not_coverable
 
@@ -550,7 +614,9 @@ class TeamFormationProblem:
                                             for i in range(len(taskMatrix)) for j in range(len(taskMatrix[0])) if taskMatrix[i][j] > 0)
             
         # Silence model output
-        # m.setParam('OutputFlag', 0)
+        m.setParam('OutputFlag', 0)
+
+        logging.info("Computing LP solution matrix...")
 
         #Solve LP model
         m.optimize()
@@ -566,20 +632,25 @@ class TeamFormationProblem:
         ARGS:
             numRounds   : Number of rounds R to run algorithm for
         RETURN:
-            task_assignment
+            taskAssignmentMatrixList    : list of task assignments over several rounds
         '''
         startTime = time.perf_counter()
         
+        #Solve relaxed LP
         expertMatrix, taskMatrix, tnc = self.createExpertTaskSkillMatrices()
         LP_solution = self.solve_LP(expertMatrix, taskMatrix)
 
         #List of task assignment matrices for each round
         taskAssignmentMatrixList = []
 
+        #List of total task coverage for each round
+        taskCoverageList = []
+
         #Create empty task assigment matrix for first round
         taskAssignment_0 = np.zeros((self.n, self.m), dtype=np.int8)    
         taskAssignmentMatrixList.append(taskAssignment_0)
-        
+
+        logging.info("Running Probabilistic Task Assignment using LP Solution Matrix")
         for round in range(numRounds):
             #Run a round of the probabilistic algorithm using LP_solution matrix
             for i in range(self.n):
@@ -590,15 +661,19 @@ class TeamFormationProblem:
                         if randVal <= LP_solution[i,j]: #Assign expert to task if randVal <= prob
                             taskAssignmentMatrixList[round][i,j] = 1
 
+            #Compute task coverage
+            roundTaskCoverageVal = self.computeTotalTaskCoverage(taskAssignmentMatrixList[round])
+            taskCoverageList.append(roundTaskCoverageVal)
+
             #Create next matrix using the last task assignment until second last round
             if round < (numRounds-1):
                 nextRoundTaskAssignment = taskAssignmentMatrixList[round].copy()
                 taskAssignmentMatrixList.append(nextRoundTaskAssignment)
 
         runTime = time.perf_counter() - startTime
-        logging.debug("LP solver Assignment computation time = {:.1f} seconds".format(runTime))
+        logging.info("LP solver Assignment computation time = {:.1f} seconds".format(runTime))
 
-        return taskAssignmentMatrixList
+        return taskAssignmentMatrixList, taskCoverageList
 
     
     def createMaxHeap(self):
