@@ -7,7 +7,10 @@ import numpy as np
 from heapq import heappop, heappush, heapify
 import time, random
 import matplotlib.pyplot as plt
+import gurobipy as gp
+from gurobipy import GRB
 import logging
+
 logging.basicConfig(format='%(asctime)s |%(levelname)s: %(message)s', level=logging.INFO)
 
 
@@ -440,6 +443,23 @@ class TeamFormationProblem:
         logging.debug("Greedy Task Assignment computation time = {:.1f} seconds".format(runTime))
 
         return taskAssignment
+    
+
+    def solve_lp(self):
+        '''
+        Given an instance of the task assignment problem, solve the relaxed LP with m tasks and n experts
+
+        '''
+        #Create empty assigment matrix
+        X = np.zeros((self.n, self.m), dtype=np.int8)
+
+        #Create Gurobi LP Model
+        m = gp.Model("TaskCoverageLP")
+
+        #Add variables
+        L = m.addVar(vtype='S', name = 'Load')
+
+
 
 
     def lp_taskCoverage(self):
@@ -448,11 +468,10 @@ class TeamFormationProblem:
 
         '''
         startTime = time.perf_counter()
-        
 
+        
         runTime = time.perf_counter() - startTime
         logging.debug("LP solver Assignment computation time = {:.1f} seconds".format(runTime))
-
 
 
     
