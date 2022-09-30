@@ -314,7 +314,6 @@ class TeamFormationProblem:
 
         return taskAssignment_i
 
-    
 
     def baseline_Random(self):
         '''
@@ -643,8 +642,8 @@ class TeamFormationProblem:
         #List of task assignment matrices for each round
         taskAssignmentMatrixList = []
 
-        #List of total task coverage for each round
-        taskCoverageList = []
+        #List of total task coverage and max load for each round - stored as a list of tuples
+        taskCoverageMaxLoadList = []
 
         #Create empty task assigment matrix for first round
         taskAssignment_0 = np.zeros((self.n, self.m), dtype=np.int8)    
@@ -661,9 +660,10 @@ class TeamFormationProblem:
                         if randVal <= LP_solution[i,j]: #Assign expert to task if randVal <= prob
                             taskAssignmentMatrixList[round][i,j] = 1
 
-            #Compute task coverage
+            #Compute task coverage and maximum load
             roundTaskCoverageVal = self.computeTotalTaskCoverage(taskAssignmentMatrixList[round])
-            taskCoverageList.append(roundTaskCoverageVal)
+            roundMaxCoverageVal = self.maximumExpertLoad(taskAssignmentMatrixList[round])
+            taskCoverageMaxLoadList.append((roundTaskCoverageVal, roundMaxCoverageVal))
 
             #Create next matrix using the last task assignment until second last round
             if round < (numRounds-1):
@@ -673,7 +673,7 @@ class TeamFormationProblem:
         runTime = time.perf_counter() - startTime
         logging.info("LP solver Assignment computation time = {:.1f} seconds".format(runTime))
 
-        return taskAssignmentMatrixList, taskCoverageList
+        return taskAssignmentMatrixList, taskCoverageMaxLoadList
 
     
     def createMaxHeap(self):
