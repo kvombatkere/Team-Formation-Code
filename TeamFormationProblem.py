@@ -445,34 +445,160 @@ class TeamFormationProblem:
         return taskAssignment
     
 
-    def solve_lp(self):
+    def createExpertTaskSkillMatrices(self):
         '''
-        Given an instance of the task assignment problem, solve the relaxed LP with m tasks and n experts
+        Create (n_experts, n_skills) and (m_tasks, n_skills) matrices from skill and expert lists
+        RETURN:
+            experts_mat : (n_experts, n_skills) binary matrix
+            tasks_mat   : (m_tasks, n_skills) binary matrix
+            tasks_not_coverable : list of tasks that are not fully coverable
+        '''
+        #First check if all tasks are coverable and get set of all skills
+        all_experts_skillset = set()
 
+        for expert_i in self.experts:
+            for skill in expert_i:
+                all_experts_skillset = all_experts_skillset.union({skill})
+
+        s_skills = len(all_experts_skillset) #Get total number of skills
+
+        #Create (n_experts, n_skills) matrix
+        experts_mat = np.zeros((len(self.experts), s_skills), dtype=np.int8)
+        for expert_index, expert_i in enumerate(self.experts):
+            for skill in expert_i:
+                skill_index = int(skill)
+                experts_mat[expert_index][skill_index] = 1
+
+        print("Generated expert-skill matrix, shape = {}".format(experts_mat.shape))
+        
+        #Create (m_tasks, n_skills) matrix
+        tasks_mat = np.zeros((len(self.tasks), s_skills), dtype=np.int8)
+
+        tasks_not_coverable = []
+        allTasksCoverable = True
+
+        for task_index, task_i in enumerate(self.tasks):
+            for skill in task_i:
+                skill_index = int(skill)
+                tasks_mat[task_index][skill_index] = 1
+
+                if skill not in all_experts_skillset:
+                    allTasksCoverable = False
+                    tasks_not_coverable.append(task_index)
+        
+        print("Generated task-skill matrix, shape = {}".format(tasks_mat.shape))
+
+        if not allTasksCoverable:
+            print("{} Tasks not fully coverable: {}".format(len(tasks_not_coverable), tasks_not_coverable))
+        
+        return experts_mat, tasks_mat, tasks_not_coverable
+
+    
+    def convertLPSolutionToMatrix(self, lp_model):
         '''
-        #Create empty assigment matrix
-        X = np.zeros((self.n, self.m), dtype=np.int8)
+        Convert the lp_model output to a (n_experts x m_tasks) matrix
+        Entries in n x m matrix represent probabilities of assigning expert i to task j
+        ARGS:
+            lp_model: Gurobi solved LP model
+        RETURN:
+            LP_soln_matrix: (n_experts x m_tasks) matrix with LP solution X_ji values as per Power in Unity paper
+        '''
+        v = lp_model.getVars()
+        count = 0
+
+        LP_soln_matrix = np.zeros((self.n, self.m), dtype=np.float32)
+        
+        for i in range(self.n):
+            for j in range(self.m):
+                LP_soln_matrix[i,j] = v[count].x
+                count += 1
+
+        return LP_soln_matrix
+
+
+    def solve_LP(self, expertMatrix, taskMatrix):
+        '''
+        Given (n_experts, n_skills) and (m_tasks, n_skills) matrices, solve the relaxed ILP and return 
+        a (n_experts x m_tasks) matrix with LP solution
+        ARGS:
+            expertMatrix : (n_experts, n_skills) binary matrix of expert skills
+            taskMatrix   : (m_tasks, n_skills) binary matrix of task skills
+        RETURN:
+            LP_solution_matrix: (n_experts x m_tasks) matrix with LP solution X_ji values as per Power in Unity paper
+        '''
+        #Create empty assignment matrix of shape (n_experts x m_tasks)
+        X =  np.zeros((len(expertMatrix), len(taskMatrix)), dtype=np.int8)
 
         #Create Gurobi LP Model
         m = gp.Model("TaskCoverageLP")
 
         #Add variables
+        x = m.addVars(len(X), len(X[1]), vtype='S', ub=1.0, name="x")
+
+        #Set objective function
         L = m.addVar(vtype='S', name = 'Load')
+        obj = 1*L
+        m.setObjective(obj, GRB.MINIMIZE)
+
+        #Add constraints
+        # c1 - Load of each expert is upper bounded by L
+        c1 = m.addConstrs(x.sum(i,'*') <= L for i in range(len(X)))
+
+        # c2 - Each task is (fully) covered
+        experts_transpose = np.transpose(expertMatrix)
+        c2 = m.addConstrs(gp.quicksum(experts_transpose[j][l]*x[l,i] for l in range(len(expertMatrix))) >= taskMatrix[i][j] 
+                                            for i in range(len(taskMatrix)) for j in range(len(taskMatrix[0])) if taskMatrix[i][j] > 0)
+            
+        # Silence model output
+        # m.setParam('OutputFlag', 0)
+
+        #Solve LP model
+        m.optimize()
+
+        LP_solution_matrix = self.convertLPSolutionToMatrix(m)
+
+        return LP_solution_matrix
 
 
-
-
-    def lp_taskCoverage(self):
+    def setCoverLPTaskCoverage(self, numRounds):
         '''
-        Solve the linear program using the Algorithm outlined in Power in Unity
-
+        Adapted LP algorithm for the non-online setting of the Load minimization problem by Anagnostopoulos et al.
+        ARGS:
+            numRounds   : Number of rounds R to run algorithm for
+        RETURN:
+            task_assignment
         '''
         startTime = time.perf_counter()
-
         
+        expertMatrix, taskMatrix, tnc = self.createExpertTaskSkillMatrices()
+        LP_solution = self.solve_LP(expertMatrix, taskMatrix)
+
+        #List of task assignment matrices for each round
+        taskAssignmentMatrixList = []
+
+        #Create empty task assigment matrix for first round
+        taskAssignment_0 = np.zeros((self.n, self.m), dtype=np.int8)    
+        taskAssignmentMatrixList.append(taskAssignment_0)
+        
+        for round in range(numRounds):
+            #Run a round of the probabilistic algorithm using LP_solution matrix
+            for i in range(self.n):
+                for j in range(self.m):
+                    #Only consider non-zero values
+                    if LP_solution[i,j] != 0:
+                        randVal = random.random()
+                        if randVal <= LP_solution[i,j]: #Assign expert to task if randVal <= prob
+                            taskAssignmentMatrixList[round][i,j] = 1
+
+            #Create next matrix using the last task assignment until second last round
+            if round < (numRounds-1):
+                nextRoundTaskAssignment = taskAssignmentMatrixList[round].copy()
+                taskAssignmentMatrixList.append(nextRoundTaskAssignment)
+
         runTime = time.perf_counter() - startTime
         logging.debug("LP solver Assignment computation time = {:.1f} seconds".format(runTime))
 
+        return taskAssignmentMatrixList
 
     
     def createMaxHeap(self):
