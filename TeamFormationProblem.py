@@ -516,45 +516,66 @@ class TeamFormationProblem:
             tasks_mat   : (m_tasks, n_skills) binary matrix
             tasks_not_coverable : list of tasks that are not fully coverable
         '''
-        #First check if all tasks are coverable and get set of all skills
+        #First check if all tasks are coverable and get set of all skills from experts and tasks
         all_experts_skillset = set()
+        all_tasks_skillset = set()
 
         for expert_i in self.experts:
             for skill in expert_i:
                 all_experts_skillset = all_experts_skillset.union({skill})
 
-        s_skills = len(all_experts_skillset) #Get total number of skills
+        allTasksCoverable = True
+        for task_j in self.tasks:
+            for skill in task_j:
+                all_tasks_skillset = all_tasks_skillset.union({skill})
+                if skill not in all_experts_skillset:
+                    allTasksCoverable = False
+
+        all_skills_set = all_experts_skillset.union(all_tasks_skillset)
+        numSkills = len(all_skills_set) #Get total number of skills
+
+        logging.info("Extracted expert and tasks skillset, Total skills = {}".format(numSkills))
+
+        partialCoverageBoundMatrix = np.ones((self.m, numSkills), dtype=np.float32)
+        #Reindex skills for datasets with partial coverage and get partial coverage values
+        if not allTasksCoverable:
+            skillsNewIndexDict = {}
+            for indx, val in enumerate(all_skills_set):
+                skillsNewIndexDict[val] = indx
+
+            for task_index, task_i in enumerate(self.tasks):
+                for skill in task_i:
+                    if skill not in all_experts_skillset:
+                        skillIndex = skillsNewIndexDict[skill]
+                        partialCoverageBoundMatrix[task_index, skillIndex] = 0
+            
+            logging.info("Full task coverage not possible, generated coverage upper bounds for each task")
 
         #Create (n_experts, n_skills) matrix
-        experts_mat = np.zeros((len(self.experts), s_skills), dtype=np.int8)
+        experts_mat = np.zeros((self.n, numSkills), dtype=np.int8)
         for expert_index, expert_i in enumerate(self.experts):
             for skill in expert_i:
                 skill_index = int(skill)
+                if not allTasksCoverable:
+                    skill_index = skillsNewIndexDict[skill]
+
                 experts_mat[expert_index][skill_index] = 1
 
         logging.info("Generated expert-skill matrix, shape = {}".format(experts_mat.shape))
         
         #Create (m_tasks, n_skills) matrix
-        tasks_mat = np.zeros((len(self.tasks), s_skills), dtype=np.int8)
-
-        tasks_not_coverable = []
-        allTasksCoverable = True
+        tasks_mat = np.zeros((self.m, numSkills), dtype=np.int8)
 
         for task_index, task_i in enumerate(self.tasks):
             for skill in task_i:
                 skill_index = int(skill)
+                if not allTasksCoverable:
+                    skill_index = skillsNewIndexDict[skill]
                 tasks_mat[task_index][skill_index] = 1
-
-                if skill not in all_experts_skillset:
-                    allTasksCoverable = False
-                    tasks_not_coverable.append(task_index)
         
         logging.info("Generated task-skill matrix, shape = {}".format(tasks_mat.shape))
-
-        if not allTasksCoverable:
-            logging.info("{} Tasks not fully coverable: {}".format(len(tasks_not_coverable), tasks_not_coverable))
         
-        return experts_mat, tasks_mat, tasks_not_coverable
+        return experts_mat, tasks_mat, partialCoverageBoundMatrix
 
     
     def convertLPSolutionToMatrix(self, lp_model):
@@ -579,7 +600,7 @@ class TeamFormationProblem:
         return LP_soln_matrix
 
 
-    def solve_LP(self, expertMatrix, taskMatrix):
+    def solve_LP(self, expertMatrix, taskMatrix, partialCoverageMatrix):
         '''
         Given (n_experts, n_skills) and (m_tasks, n_skills) matrices, solve the relaxed ILP and return 
         a (n_experts x m_tasks) matrix with LP solution
@@ -590,7 +611,7 @@ class TeamFormationProblem:
             LP_solution_matrix: (n_experts x m_tasks) matrix with LP solution X_ji values as per Power in Unity paper
         '''
         #Create empty assignment matrix of shape (n_experts x m_tasks)
-        X =  np.zeros((len(expertMatrix), len(taskMatrix)), dtype=np.int8)
+        X =  np.zeros((self.n, self.m), dtype=np.float32)
 
         #Create Gurobi LP Model
         m = gp.Model("TaskCoverageLP")
@@ -609,7 +630,7 @@ class TeamFormationProblem:
 
         # c2 - Each task is (fully) covered
         experts_transpose = np.transpose(expertMatrix)
-        c2 = m.addConstrs(gp.quicksum(experts_transpose[j][l]*x[l,i] for l in range(len(expertMatrix))) >= taskMatrix[i][j] 
+        c2 = m.addConstrs(gp.quicksum(expertMatrix[l][j]*x[l,i] for l in range(len(expertMatrix))) >= partialCoverageMatrix[i][j]*taskMatrix[i][j] 
                                             for i in range(len(taskMatrix)) for j in range(len(taskMatrix[0])) if taskMatrix[i][j] > 0)
             
         # Silence model output
@@ -636,8 +657,8 @@ class TeamFormationProblem:
         startTime = time.perf_counter()
         
         #Solve relaxed LP
-        expertMatrix, taskMatrix, tnc = self.createExpertTaskSkillMatrices()
-        LP_solution = self.solve_LP(expertMatrix, taskMatrix)
+        expertMatrix, taskMatrix, partialCovMat = self.createExpertTaskSkillMatrices()
+        LP_solution = self.solve_LP(expertMatrix, taskMatrix, partialCovMat)
 
         #List of task assignment matrices for each round
         taskAssignmentMatrixList = []
