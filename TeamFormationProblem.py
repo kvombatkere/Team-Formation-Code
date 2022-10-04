@@ -629,7 +629,6 @@ class TeamFormationProblem:
         c1 = m.addConstrs(x.sum(i,'*') <= L for i in range(len(X)))
 
         # c2 - Each task is (fully) covered
-        experts_transpose = np.transpose(expertMatrix)
         c2 = m.addConstrs(gp.quicksum(expertMatrix[l][j]*x[l,i] for l in range(len(expertMatrix))) >= partialCoverageMatrix[i][j]*taskMatrix[i][j] 
                                             for i in range(len(taskMatrix)) for j in range(len(taskMatrix[0])) if taskMatrix[i][j] > 0)
             
